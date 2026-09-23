@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { applyMove, applyUci } from '../core/chessRules';
 import { CONFIG, type ModeRules } from '../core/config';
+import { applyLineTolerance, preferLineReply } from '../core/judge/lineRules';
 import { chooseDefense } from '../core/judge/opponent';
 import { judgeMove } from '../core/judge/tablebaseJudge';
 import type { TablebaseLookup } from '../core/judge/tablebaseTypes';
@@ -66,10 +67,12 @@ export function usePuzzlePlayer(
         try {
           const before = await lookup(applied.fenBefore);
           if (token.current !== myToken) return;
-          const verdict = judgeMove(before, applied.uci, {
+          const raw = judgeMove(before, applied.uci, {
             slowMoveToleranceMoves: CONFIG.judge.slowMoveToleranceMoves,
           });
-          if (!verdict) throw new Error(`Coup ${applied.san} absent de la réponse de la table.`);
+          if (!raw) throw new Error(`Coup ${applied.san} absent de la réponse de la table.`);
+          const previousUci = current.moves.map((m) => m.uci);
+          const verdict = applyLineTolerance(raw, applied.uci, previousUci, puzzle.solution);
           const verdictMs = Math.round(performance.now() - started);
           setTimings((t) => ({ ...t, verdictMs }));
           dispatch({ type: 'VERDICT', verdict });
@@ -80,8 +83,9 @@ export function usePuzzlePlayer(
           const opponentStart = performance.now();
           const after = await lookup(applied.fen);
           if (token.current !== myToken) return;
-          const defense = chooseDefense(after);
-          if (!defense) return;
+          const best = chooseDefense(after);
+          if (!best) return;
+          const defense = preferLineReply(after, best, [...previousUci, applied.uci], puzzle.solution);
           const reply = applyUci(applied.fen, defense.uci);
           if (!reply) throw new Error(`Réponse adverse illégale : ${defense.uci}`);
           const opponentMs = Math.round(performance.now() - opponentStart);

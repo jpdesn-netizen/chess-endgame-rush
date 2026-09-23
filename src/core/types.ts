@@ -25,6 +25,16 @@ export interface Puzzle {
   rating: number;
   /** Idée clé affichée au joueur. */
   concept: string;
+  /** Famille de finale (calculée si absente). */
+  family?: Family;
+  /** Dernier coup adverse avant la position (UCI), pour le surligner. */
+  lastMove?: string;
+  /** Ligne de la partie réelle (UCI), à partir du coup du joueur. */
+  solution?: string[];
+  /** Thèmes Lichess. */
+  themes?: string[];
+  /** Lien vers la partie d'origine. */
+  gameUrl?: string;
 }
 
 /** Résultat théorique vu par un camp. */

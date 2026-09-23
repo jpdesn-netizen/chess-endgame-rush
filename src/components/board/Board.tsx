@@ -90,7 +90,11 @@ export function Board({ fen, orientation, interactive, lastMove, marks = [], onM
     }
     if (isOwnPiece(square)) {
       setSelected(square);
-      svgRef.current?.setPointerCapture(e.pointerId);
+      try {
+        svgRef.current?.setPointerCapture(e.pointerId); // suivre le glisser même hors de l'échiquier
+      } catch {
+        /* pointeur déjà relâché : sans conséquence */
+      }
       setDrag({ from: square, x, y, moved: false, pointerId: e.pointerId });
     } else {
       setSelected(null);

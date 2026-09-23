@@ -65,7 +65,7 @@ export function initialSession(puzzle: Puzzle, rules: ModeRules): SessionState {
     seen: [positionKey(puzzle.fen)],
     moves: [],
     playerMoveCount: 0,
-    lastMove: null,
+    lastMove: puzzle.lastMove ? { from: puzzle.lastMove.slice(0, 2), to: puzzle.lastMove.slice(2, 4) } : null,
     lastPlayerMove: null,
     phase: 'awaitingPlayer',
     verdict: null,
