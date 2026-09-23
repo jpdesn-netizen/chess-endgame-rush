@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Board, type MarkTone } from '../components/board/Board';
 import { feedbackFor, type Tone } from '../components/hud/feedback';
 import { TRAINING_RULES } from '../core/config';
@@ -20,13 +20,24 @@ interface Props {
   puzzle: Puzzle;
   position: { index: number; total: number };
   judge: MoveJudge;
+  onAttempt?: (puzzle: Puzzle, success: boolean) => void;
   onNext: () => void;
   onHome: () => void;
 }
 
-export function GameScreen({ puzzle, position, judge, onNext, onHome }: Props) {
+export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome }: Props) {
   const { state, timings, playMove, reset } = usePuzzlePlayer(puzzle, TRAINING_RULES, judge);
   const feedback = feedbackFor(state);
+
+  // Archivage : première issue de chaque tentative (un « Recommencer » en crée une nouvelle).
+  const archived = useRef(false);
+  useEffect(() => {
+    if (state.phase === 'awaitingPlayer' && state.moves.length === 0) archived.current = false;
+    if (!archived.current && (state.phase === 'solved' || state.phase === 'failed')) {
+      archived.current = true;
+      onAttempt?.(puzzle, state.phase === 'solved');
+    }
+  }, [state.phase, state.moves.length, puzzle, onAttempt]);
   const playerIsWhite = state.playerColor === 'w';
   const turnIsWhite = state.fen.split(' ')[1] === 'w';
   const finished = state.phase === 'solved' || state.phase === 'failed' || state.phase === 'error';

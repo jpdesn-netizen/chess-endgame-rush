@@ -18,6 +18,10 @@ interface Props {
   startRating: number;
   scoreKey: string;
   judge: MoveJudge;
+  /** Archivage (profil joueur) : un puzzle terminé. */
+  onAttempt?: (puzzle: Puzzle, success: boolean) => void;
+  /** Archivage : une partie terminée. */
+  onRunEnd?: (run: { mode: RushMode; theme: string; level: number; score: number; errors: number; bestCombo: number }) => void;
   onRestart: () => void;
   onHome: () => void;
 }
@@ -30,7 +34,7 @@ function formatTime(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, onRestart, onHome }: Props) {
+export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, onAttempt, onRunEnd, onRestart, onHome }: Props) {
   const [rush, setRush] = useState<RushState>(() => startRush(mode, startRating));
   const [current, setCurrent] = useState<Puzzle | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -96,8 +100,10 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, on
   useEffect(() => {
     if (rush.status !== 'over' || result) return;
     setResult(submitScore(scoreKey, rush.score));
-    notifyParent({ mode, theme, level: startRating, score: rush.score, bestCombo: rush.bestCombo, errors: rush.errors });
-  }, [rush, result, scoreKey, mode, theme, startRating]);
+    const run = { mode, theme, level: startRating, score: rush.score, bestCombo: rush.bestCombo, errors: rush.errors };
+    notifyParent(run);
+    if (rush.history.length > 0) onRunEnd?.(run);
+  }, [rush, result, scoreKey, mode, theme, startRating, onRunEnd]);
 
   const onPlayerMove = useCallback(() => {
     if (rushRef.current.status === 'waiting') {
@@ -116,6 +122,7 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, on
         const entry = { puzzleId: current.id, rating: current.rating, success: end === 'solved', gameUrl: current.gameUrl, title: current.title };
         next = rushReducer(state, { type: end === 'solved' ? 'SOLVED' : 'FAILED', now: Date.now(), entry });
         setRush(next);
+        if (next.history.length > state.history.length) onAttempt?.(current, end === 'solved');
         if (next.status === 'over') return;
       }
       await sleep(end === 'solved' ? CONFIG.modes.rushPauseAfterSuccessMs : CONFIG.modes.rushPauseAfterFailureMs);
@@ -134,7 +141,7 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, on
         setRush((r) => ({ ...r, status: 'over' }));
       }
     },
-    [current, findPlayable, mode],
+    [current, findPlayable, mode, onAttempt],
   );
 
   const left = remainingMs(rush, now);

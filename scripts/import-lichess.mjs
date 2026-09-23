@@ -1,5 +1,5 @@
 // Import des finales de la base de puzzles Lichess (licence CC0).
-// Usage : node scripts/import-lichess.mjs <fichier.csv> [parCase=120] [parCaseLongues=80] [maxPièces=12]
+// Usage : node scripts/import-lichess.mjs <fichier.csv> [parMatériel=40] [parCaseLongues=80] [maxPièces=12]
 // Sortie : public/data/lichess-endgames.json
 //
 // Règles de sélection :
@@ -7,7 +7,10 @@
 //  - finales « courtes » (≤ 7 pièces, jugées par la table Syzygy) et
 //    « longues » (8 à maxPièces pièces, jugées par Stockfish)
 //  - qualité : RatingDeviation ≤ 100, NbPlays ≥ 200, Popularity ≥ 70
-//  - échantillon équilibré : jusqu'à N puzzles par (famille × tranche Elo × taille),
+//  - échantillon équilibré :
+//      finales courtes : jusqu'à N par (matériel exact × tranche Elo), pour que
+//      chaque sous-thème (R+P vs R, T+P vs T…) soit bien fourni ;
+//      finales longues : jusqu'à M par (famille × tranche Elo),
 //    les plus populaires d'abord (sélection déterministe)
 //
 // Format Lichess : le FEN est la position AVANT le coup de l'adversaire ;
@@ -18,7 +21,7 @@ import { createInterface } from 'node:readline';
 import { Chess } from 'chess.js';
 
 const input = process.argv[2];
-const perCell = Number(process.argv[3] ?? 120);
+const perCell = Number(process.argv[3] ?? 40);
 const perCellLong = Number(process.argv[4] ?? 80);
 const maxPieces = Number(process.argv[5] ?? 12);
 if (!input) {
@@ -34,6 +37,17 @@ const BANDS = [
   { id: '1800-2199', max: 2200 },
   { id: '2200+', max: Infinity },
 ];
+
+const VALUE = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+/** Matériel exact, camp fort d'abord (ex. « rp-r »), rois exclus. */
+function materialKey(placement) {
+  const side = (re) => [...placement.replace(re, '')].filter((c) => c !== 'k' && c !== 'K').map((c) => c.toLowerCase());
+  const w = side(/[^QRBNP]/g);
+  const b = side(/[^qrbnp]/g);
+  const val = (l) => l.reduce((s, c) => s + VALUE[c], 0);
+  const str = (l) => l.sort((x, y) => 'qrbnp'.indexOf(x) - 'qrbnp'.indexOf(y)).join('') || 'k';
+  return val(w) >= val(b) ? `${str(w)}-${str(b)}` : `${str(b)}-${str(w)}`;
+}
 
 function familyOf(placement) {
   const pieces = placement.replace(/[^a-zA-Z]/g, '').toLowerCase();
@@ -78,7 +92,7 @@ for await (const line of rl) {
   const family = familyOf(placement);
   const r = Number(rating);
   const band = BANDS.find((b) => r < b.max).id;
-  const key = `${family}|${band}|${size}`;
+  const key = size === 'courte' ? `courte|${materialKey(placement)}|${band}` : `longue|${family}|${band}`;
   const list = cells.get(key) ?? [];
   list.push({
     id: `lichess-${id}`,
@@ -98,13 +112,15 @@ for await (const line of rl) {
 }
 
 const selected = [];
+const summary = new Map();
 for (const [key, list] of [...cells.entries()].sort()) {
   list.sort((a, b) => b.popularity - a.popularity || a.id.localeCompare(b.id));
-  const chosen = list.slice(0, key.endsWith('longue') ? perCellLong : perCell).map(({ popularity: _p, ...rest }) => rest);
+  const chosen = list.slice(0, key.startsWith('longue') ? perCellLong : perCell).map(({ popularity: _p, ...rest }) => rest);
   selected.push(...chosen);
-  console.log(`${key.padEnd(32)} ${String(list.length).padStart(6)} éligibles → ${chosen.length}`);
+  summary.set(key.split('|').slice(0, 2).join('|'), (summary.get(key.split('|').slice(0, 2).join('|')) ?? 0) + chosen.length);
 }
 selected.sort((a, b) => a.rating - b.rating);
+for (const [k, n] of [...summary.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)) console.log(`${k.padEnd(28)} ${n}`);
 
 mkdirSync('public/data', { recursive: true });
 writeFileSync(

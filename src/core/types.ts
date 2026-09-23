@@ -27,6 +27,8 @@ export interface Puzzle {
   concept: string;
   /** Famille de finale (calculée si absente). */
   family?: Family;
+  /** Sous-catégorie par matériel (calculée au chargement, cf. categories.ts). */
+  subcategory?: string;
   /** Dernier coup adverse avant la position (UCI), pour le surligner. */
   lastMove?: string;
   /** Ligne de la partie réelle (UCI), à partir du coup du joueur. */

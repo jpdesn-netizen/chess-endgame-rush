@@ -5,7 +5,12 @@ Entraînement aux finales d'échecs inspiré de Lichess Puzzle Storm / Streak.
 - **Storm** : 3 min, +3 s par réussite, −10 s par erreur ; le chrono démarre au premier coup.
 - **Streak** : difficulté croissante, la série s'arrête à la première erreur.
 - **Entraînement** : 11 positions théoriques « Bases », jusqu'au mat.
-- Environ 6 000 finales issues de parties réelles (base de puzzles Lichess, CC0).
+- 13 400 finales issues de parties réelles (base de puzzles Lichess, CC0), classées en
+  familles et sous-thèmes par matériel exact (♔♙ vs ♚, ♖♙ vs ♜, ♕ vs ♟…), comme Endgame Trainer.
+- Profils joueurs : chaque puzzle et chaque partie sont archivés ; écran « Progrès » avec
+  l'évolution des scores et les points faibles par sous-thème (filtres mode / famille / période).
+  Étape 1 : stockage dans le navigateur (export / import de sauvegarde) ; étape 2 prévue :
+  comptes en ligne, avec reprise de l'historique.
 - Chaque coup est jugé par la **table de finales Syzygy** (API Lichess) jusqu'à 7 pièces,
   et par **Stockfish** (dans le navigateur) au-delà.
 
@@ -49,6 +54,7 @@ Paramètres d'URL (tous facultatifs) :
 | `mode` | `storm`, `streak`, `training` | Mode présélectionné |
 | `theme` | `mix`, `pions`, `tours`, `dames`, `fous`, `cavaliers`, `mixte`, `bases` | Thème présélectionné |
 | `level` | `600`, `1200`, `1600`, `2000`… | Elo de départ |
+| `sub` | `rp-r`, `kp-k`, `q-p`… (cf. `src/core/categories.ts`) | Sous-thème présélectionné |
 
 En fin de partie, l'application envoie au site parent un message
 `{ type: 'cer:result', mode, theme, level, score, bestCombo, errors }` :

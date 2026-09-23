@@ -11,9 +11,9 @@
     "prebuild": "node scripts/copy-stockfish.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx --test tests/fen.test.ts tests/material.test.ts tests/judge.test.ts tests/opponent.test.ts tests/chessRules.test.ts tests/session.test.ts tests/puzzles.test.ts tests/tablebaseClient.test.ts tests/rush.test.ts tests/engine.test.ts",
+    "test": "tsx --test tests/fen.test.ts tests/material.test.ts tests/judge.test.ts tests/opponent.test.ts tests/chessRules.test.ts tests/session.test.ts tests/puzzles.test.ts tests/tablebaseClient.test.ts tests/rush.test.ts tests/engine.test.ts tests/stats.test.ts",
     "verify:puzzles": "tsx scripts/verify-puzzles.ts",
-    "import:lichess": "node scripts/import-lichess.mjs lichess_db_puzzle.csv/lichess_db_puzzle.csv 120"
+    "import:lichess": "node scripts/import-lichess.mjs lichess_db_puzzle.csv/lichess_db_puzzle.csv"
   },
   "dependencies": {
     "@lichess-org/chessground": "^10.2.0",

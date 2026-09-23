@@ -78,12 +78,9 @@ export function Board({ fen, orientation, interactive, lastMove, marks = [], arr
   // Création / destruction de l'échiquier.
   useEffect(() => {
     if (!el.current) return;
+    // chessground suit lui-même les changements de taille (ResizeObserver interne).
     api.current = Chessground(el.current, config);
-    // Redimensionnement : chessground doit recalculer ses coordonnées.
-    const observer = new ResizeObserver(() => api.current?.redrawAll());
-    observer.observe(el.current);
     return () => {
-      observer.disconnect();
       api.current?.destroy();
       api.current = null;
     };

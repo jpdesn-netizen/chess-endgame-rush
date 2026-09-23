@@ -1,3 +1,4 @@
+import { SUBCATEGORIES } from '../core/categories';
 import { CONFIG } from '../core/config';
 import { sideToMove } from '../core/fen';
 import { materialSignature } from '../core/material';
@@ -39,6 +40,13 @@ interface Props {
   compact?: boolean;
   mode: HomeMode;
   theme: ThemeChoice;
+  /** Sous-thème (id) ou 'all'. */
+  sub: string;
+  /** Nombre de finales disponibles par sous-thème (id → n) et par famille. */
+  counts: Map<string, number>;
+  playerName: string | null;
+  onProgress: () => void;
+  onSub: (s: string) => void;
   startRating: number;
   poolSize: number | null;
   loadError: string | null;
@@ -49,6 +57,13 @@ interface Props {
   onStartRating: (r: number) => void;
   onStart: () => void;
   onTrain: (index: number) => void;
+}
+
+const subChip = (active: boolean) =>
+  `rounded-lg px-2.5 py-1 text-sm transition disabled:opacity-30 ${active ? 'bg-amber-500 text-stone-900' : 'bg-stone-800/70 text-stone-200 hover:bg-stone-700'}`;
+
+function Count({ n }: { n?: number }) {
+  return <span className="ml-1 text-xs opacity-60 tabular-nums">{n ?? 0}</span>;
 }
 
 const chip = (active: boolean) =>
@@ -64,6 +79,15 @@ export function HomeScreen(p: Props) {
           <h1 className={`font-extrabold text-stone-50 ${p.compact ? 'text-2xl' : 'text-3xl sm:text-4xl'}`}>♔ Chess Endgame Rush</h1>
           {!p.compact && <p className="mt-2 text-stone-400">Finales de parties réelles, jugées coup par coup (table de finales et Stockfish).</p>}
         </div>
+        <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={p.onProgress}
+          className="rounded-lg bg-stone-800 px-3 py-2 text-sm font-semibold text-stone-100 hover:bg-stone-700"
+          title="Joueurs et progression"
+        >
+          👤 {p.playerName ?? 'Invité'} · 📈
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -76,6 +100,7 @@ export function HomeScreen(p: Props) {
         >
           {sound ? '🔊' : '🔇'}
         </button>
+        </div>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
@@ -105,6 +130,33 @@ export function HomeScreen(p: Props) {
                 </button>
               ))}
             </div>
+            {p.theme !== 'mix' && p.theme !== 'bases' && (
+              <div className="mt-3 flex flex-wrap gap-2 border-l-2 border-stone-700 pl-3" aria-label="Sous-thèmes">
+                <button type="button" className={subChip(p.sub === 'all')} onClick={() => p.onSub('all')}>
+                  Tous <Count n={p.counts.get(p.theme)} />
+                </button>
+                {SUBCATEGORIES.filter((s) => s.family === p.theme).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    title={s.title}
+                    disabled={!p.counts.get(s.id)}
+                    className={subChip(p.sub === s.id)}
+                    onClick={() => p.onSub(s.id)}
+                  >
+                    <span className="text-base leading-none">{s.label}</span> <Count n={p.counts.get(s.id)} />
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={!p.counts.get(`${p.theme}-autres`)}
+                  className={subChip(p.sub === `${p.theme}-autres`)}
+                  onClick={() => p.onSub(`${p.theme}-autres`)}
+                >
+                  Autres <Count n={p.counts.get(`${p.theme}-autres`)} />
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-400">Niveau de départ</h2>
