@@ -1,21 +1,26 @@
 {
   "name": "chess-endgame-rush",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Entraînement aux finales d'échecs façon Puzzle Storm / Streak, jugé par table de finales",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/copy-stockfish.mjs",
+    "predev": "node scripts/copy-stockfish.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-stockfish.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx --test tests/fen.test.ts tests/material.test.ts tests/judge.test.ts tests/opponent.test.ts tests/chessRules.test.ts tests/session.test.ts tests/puzzles.test.ts tests/tablebaseClient.test.ts tests/rush.test.ts",
+    "test": "tsx --test tests/fen.test.ts tests/material.test.ts tests/judge.test.ts tests/opponent.test.ts tests/chessRules.test.ts tests/session.test.ts tests/puzzles.test.ts tests/tablebaseClient.test.ts tests/rush.test.ts tests/engine.test.ts",
     "verify:puzzles": "tsx scripts/verify-puzzles.ts",
     "import:lichess": "node scripts/import-lichess.mjs lichess_db_puzzle.csv/lichess_db_puzzle.csv 120"
   },
   "dependencies": {
+    "@lichess-org/chessground": "^10.2.0",
     "chess.js": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "stockfish": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "latest",
@@ -27,5 +32,6 @@
     "tsx": "latest",
     "typescript": "latest",
     "vite": "latest"
-  }
+  },
+  "license": "GPL-3.0-or-later"
 }

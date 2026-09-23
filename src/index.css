@@ -6,3 +6,13 @@ body {
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
+
+/* Damier aux couleurs « brown » de Lichess, dessiné en CSS (aucune image). */
+.cg-wrap cg-board {
+  background-color: #f0d9b5;
+  background-image: repeating-conic-gradient(#b58863 0% 25%, #f0d9b5 0% 50%);
+  background-size: 25% 25%;
+}
+.cg-wrap coords {
+  font-weight: 700;
+}

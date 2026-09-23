@@ -1,12 +1,13 @@
 // Import des finales de la base de puzzles Lichess (licence CC0).
-// Usage : node scripts/import-lichess.mjs <fichier.csv> [parCase=120]
+// Usage : node scripts/import-lichess.mjs <fichier.csv> [parCase=120] [parCaseLongues=80] [maxPièces=12]
 // Sortie : public/data/lichess-endgames.json
 //
 // Règles de sélection :
 //  - thème "endgame" + un thème de finale Lichess (pawnEndgame, rookEndgame…)
-//  - 7 pièces maximum dans la position présentée (jugeable par la table Syzygy)
+//  - finales « courtes » (≤ 7 pièces, jugées par la table Syzygy) et
+//    « longues » (8 à maxPièces pièces, jugées par Stockfish)
 //  - qualité : RatingDeviation ≤ 100, NbPlays ≥ 200, Popularity ≥ 70
-//  - échantillon équilibré : jusqu'à N puzzles par (famille × tranche Elo),
+//  - échantillon équilibré : jusqu'à N puzzles par (famille × tranche Elo × taille),
 //    les plus populaires d'abord (sélection déterministe)
 //
 // Format Lichess : le FEN est la position AVANT le coup de l'adversaire ;
@@ -18,6 +19,8 @@ import { Chess } from 'chess.js';
 
 const input = process.argv[2];
 const perCell = Number(process.argv[3] ?? 120);
+const perCellLong = Number(process.argv[4] ?? 80);
+const maxPieces = Number(process.argv[5] ?? 12);
 if (!input) {
   console.error('Usage : node scripts/import-lichess.mjs <fichier.csv> [parCase]');
   process.exit(1);
@@ -68,12 +71,14 @@ for await (const line of rl) {
   }
   const presented = chess.fen();
   const placement = presented.split(' ')[0];
-  if (placement.replace(/[^a-zA-Z]/g, '').length > 7) continue;
+  const pieces = placement.replace(/[^a-zA-Z]/g, '').length;
+  if (pieces > maxPieces) continue;
+  const size = pieces <= 7 ? 'courte' : 'longue';
 
   const family = familyOf(placement);
   const r = Number(rating);
   const band = BANDS.find((b) => r < b.max).id;
-  const key = `${family}|${band}`;
+  const key = `${family}|${band}|${size}`;
   const list = cells.get(key) ?? [];
   list.push({
     id: `lichess-${id}`,
@@ -84,6 +89,7 @@ for await (const line of rl) {
     popularity: Number(popularity),
     objective: themeList.includes('equality') ? 'draw' : 'win',
     family,
+    pieces,
     themes: themeList.filter((t) => !['endgame', 'short', 'long', 'veryLong', 'oneMove'].includes(t)),
     gameUrl,
   });
@@ -94,9 +100,9 @@ for await (const line of rl) {
 const selected = [];
 for (const [key, list] of [...cells.entries()].sort()) {
   list.sort((a, b) => b.popularity - a.popularity || a.id.localeCompare(b.id));
-  const chosen = list.slice(0, perCell).map(({ popularity: _p, ...rest }) => rest);
+  const chosen = list.slice(0, key.endsWith('longue') ? perCellLong : perCell).map(({ popularity: _p, ...rest }) => rest);
   selected.push(...chosen);
-  console.log(`${key.padEnd(24)} ${String(list.length).padStart(6)} éligibles → ${chosen.length}`);
+  console.log(`${key.padEnd(32)} ${String(list.length).padStart(6)} éligibles → ${chosen.length}`);
 }
 selected.sort((a, b) => a.rating - b.rating);
 

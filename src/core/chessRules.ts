@@ -78,3 +78,21 @@ export function applyUci(fen: string, uci: string): AppliedMove | null {
   const promotion = uci.length > 4 ? (uci[4] as PromotionPiece) : undefined;
   return applyMove(fen, uci.slice(0, 2), uci.slice(2, 4), promotion);
 }
+
+/** Tous les coups légaux, regroupés par case de départ (format attendu par l'échiquier). */
+export function legalDestsMap(fen: string): Map<string, string[]> {
+  const chess = load(fen);
+  const map = new Map<string, string[]>();
+  if (!chess) return map;
+  for (const m of chess.moves({ verbose: true })) {
+    const list = map.get(m.from) ?? [];
+    if (!list.includes(m.to)) list.push(m.to);
+    map.set(m.from, list);
+  }
+  return map;
+}
+
+/** Le camp au trait est-il en échec ? */
+export function isInCheck(fen: string): boolean {
+  return load(fen)?.inCheck() ?? false;
+}

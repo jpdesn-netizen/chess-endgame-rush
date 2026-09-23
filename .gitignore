@@ -7,3 +7,4 @@ lichess_db_puzzle.csv.zst
 # Fichier temporaire de vérification (supprimable)
 _types.tgz
 scripts/.work
+public/stockfish

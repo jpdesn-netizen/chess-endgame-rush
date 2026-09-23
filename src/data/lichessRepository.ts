@@ -12,6 +12,7 @@ interface RawPuzzle {
   rating: number;
   objective: 'win' | 'draw';
   family: Family;
+  pieces?: number;
   themes: string[];
   gameUrl: string;
 }
@@ -71,7 +72,7 @@ function toPuzzle(raw: RawPuzzle): Puzzle {
   const themes = raw.themes.filter((t) => !ENDGAME_THEME_KEYS.has(t)).map((t) => THEME_FR[t] ?? t);
   return {
     id: raw.id,
-    title: `${FAMILY_LABEL[family]} · Lichess`,
+    title: `${FAMILY_LABEL[family]}${(raw.pieces ?? 0) > 7 ? ' (longue)' : ''} · Lichess`,
     fen: raw.fen,
     objective: raw.objective,
     collection: 'lichess',

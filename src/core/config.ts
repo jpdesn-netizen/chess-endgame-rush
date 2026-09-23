@@ -10,6 +10,18 @@ export const CONFIG = {
     retries: 2,
     retryDelayMs: 800,
   },
+  engine: {
+    /**
+     * Stockfish, pour les positions de plus de 7 pièces.
+     * movetimeMs : temps de réflexion par analyse.
+     * Un coup est accepté si l'évaluation reste ≥ min(seuil, meilleure − tolérance).
+     * Ex. objectif gain : seuil +2,0 pions, tolérance 1,0 pion.
+     */
+    movetimeMs: 300,
+    winThresholdCp: 200,
+    drawThresholdCp: -50,
+    toleranceCp: 100,
+  },
   judge: {
     /**
      * Décision G : un coup qui conserve le gain est refusé s'il rallonge
@@ -30,8 +42,8 @@ export const CONFIG = {
     /** Décision C : montée de difficulté à chaque réussite. */
     streak: { maxPlayerMoves: 6, eloStep: 30 },
     /** Pause après un puzzle, pour voir le dernier coup (ms). */
-    rushPauseAfterSuccessMs: 350,
-    rushPauseAfterFailureMs: 1_200,
+    rushPauseAfterSuccessMs: 150,
+    rushPauseAfterFailureMs: 1_000,
   },
   /** Niveaux de départ proposés pour les modes Rush (Elo). */
   startLevels: [
@@ -42,7 +54,7 @@ export const CONFIG = {
   ],
   ui: {
     /** Délai minimal avant la réponse adverse, pour que le coup reste lisible. */
-    opponentMinDelayMs: 250,
+    opponentMinDelayMs: 120,
   },
 } as const;
 

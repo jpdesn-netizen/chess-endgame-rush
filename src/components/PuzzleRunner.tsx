@@ -1,27 +1,37 @@
-// Un puzzle en mode Rush : échiquier + état, et signal de fin au parent.
+// Un puzzle en mode Rush : échiquier + ligne d'état, et signal de fin au parent.
 
 import { useEffect, useMemo, useRef } from 'react';
 import { rushRules } from '../core/config';
 import { parseUci } from '../core/fen';
-import type { TablebaseLookup } from '../core/judge/tablebaseTypes';
 import type { Puzzle } from '../core/types';
 import { usePuzzlePlayer } from '../hooks/usePuzzlePlayer';
+import type { MoveJudge } from '../services/moveJudge';
 import { Board, type MarkTone } from './board/Board';
-import { feedbackFor } from './hud/feedback';
+import { feedbackFor, type Tone } from './hud/feedback';
 
 export type PuzzleEnd = 'solved' | 'failed' | 'skipped';
 
 interface Props {
   puzzle: Puzzle;
   active: boolean;
-  lookup: TablebaseLookup;
-  prefetch: (fen: string) => void;
+  judge: MoveJudge;
   onEnd: (end: PuzzleEnd) => void;
+  onPlayerMove?: () => void;
+  /** Message affiché à la place de l'état (ex. « le chrono démarre au premier coup »). */
+  banner?: string | null;
 }
 
-export function PuzzleRunner({ puzzle, active, lookup, prefetch, onEnd }: Props) {
+const TONE: Record<Tone, string> = {
+  neutral: 'text-stone-200',
+  good: 'text-emerald-300',
+  bad: 'text-red-300',
+  warn: 'text-amber-300',
+  success: 'text-emerald-300',
+};
+
+export function PuzzleRunner({ puzzle, active, judge, onEnd, onPlayerMove, banner }: Props) {
   const rules = useMemo(() => rushRules(puzzle.solution), [puzzle]);
-  const { state, playMove } = usePuzzlePlayer(puzzle, rules, lookup, prefetch);
+  const { state, playMove } = usePuzzlePlayer(puzzle, rules, judge, onPlayerMove);
   const reported = useRef(false);
 
   useEffect(() => {
@@ -34,40 +44,35 @@ export function PuzzleRunner({ puzzle, active, lookup, prefetch, onEnd }: Props)
     }
   }, [state.phase, onEnd]);
 
+  const failedBad = state.phase === 'failed' && state.verdict?.kind === 'bad' ? state.verdict : null;
   const marks = useMemo(() => {
     const list: { square: string; tone: MarkTone }[] = [];
-    if (state.phase === 'failed' && state.verdict?.kind === 'bad' && state.lastMove) {
-      list.push({ square: state.lastMove.to, tone: 'bad' });
-      const hint = state.verdict.bestUci[0];
-      if (hint) {
-        const { from, to } = parseUci(hint);
-        list.push({ square: from, tone: 'hint' }, { square: to, tone: 'hint' });
-      }
-    }
+    if (failedBad && state.lastMove) list.push({ square: state.lastMove.to, tone: 'bad' });
     if (state.phase === 'solved' && state.lastMove) list.push({ square: state.lastMove.to, tone: 'good' });
     return list;
-  }, [state.phase, state.verdict, state.lastMove]);
+  }, [failedBad, state.phase, state.lastMove]);
+  const arrow = failedBad?.bestUci[0] ? parseUci(failedBad.bestUci[0]) : null;
 
   const feedback = feedbackFor(state);
-  const turnIsWhite = state.fen.split(' ')[1] === 'w';
+  const playerWhite = state.playerColor === 'w';
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {import.meta.env.DEV && (
         // Mode développement uniquement : état lisible par les tests automatisés.
-        <span hidden data-testid="cer-state" data-phase={state.phase} data-fen={state.fen} data-puzzle={puzzle.id} data-rating={puzzle.rating} />
+        <span hidden data-testid="cer-state" data-phase={state.phase} data-fen={state.fen} data-puzzle={puzzle.id} data-rating={puzzle.rating} data-orientation={state.playerColor} />
       )}
-      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-        <span className={`rounded-full px-3 py-1 ${puzzle.objective === 'win' ? 'bg-amber-500 text-stone-900' : 'bg-sky-500 text-stone-900'}`}>
-          {puzzle.objective === 'win' ? 'GAGNER' : 'TENIR LA NULLE'}
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="flex items-center gap-2 font-semibold">
+          <span className={`inline-block h-4 w-4 rounded-full border-2 border-stone-400 ${playerWhite ? 'bg-white' : 'bg-stone-950'}`} />
+          {playerWhite ? 'Blancs' : 'Noirs'} :{' '}
+          <span className={puzzle.objective === 'win' ? 'text-amber-400' : 'text-sky-400'}>
+            {puzzle.objective === 'win' ? 'gagner' : 'tenir la nulle'}
+          </span>
         </span>
-        <span className="flex items-center gap-2 rounded-full bg-stone-800 px-3 py-1">
-          <span className={`inline-block h-3 w-3 rounded-full border border-stone-500 ${turnIsWhite ? 'bg-white' : 'bg-stone-950'}`} />
-          Au {turnIsWhite ? 'Blanc' : 'Noir'} de jouer
-        </span>
-        <span className="rounded-full bg-stone-800 px-3 py-1 text-stone-300">Elo {puzzle.rating}</span>
-        <span className="rounded-full bg-stone-800 px-3 py-1 text-stone-300">
-          coup {Math.min(state.playerMoveCount + (state.phase === 'awaitingPlayer' ? 1 : 0), rules.maxPlayerMoves ?? 0)} / {rules.maxPlayerMoves}
+        <span className="text-stone-400">
+          Elo {puzzle.rating} · coup {Math.min(state.playerMoveCount + (state.phase === 'awaitingPlayer' ? 1 : 0), rules.maxPlayerMoves ?? 1)}/
+          {rules.maxPlayerMoves}
         </span>
       </div>
       <Board
@@ -76,11 +81,11 @@ export function PuzzleRunner({ puzzle, active, lookup, prefetch, onEnd }: Props)
         interactive={active && state.phase === 'awaitingPlayer'}
         lastMove={state.lastMove}
         marks={marks}
+        arrow={arrow}
         onMove={(from, to, promotion) => playMove(from, to, promotion)}
       />
-      <p className="min-h-[1.5rem] text-sm text-stone-300" aria-live="polite">
-        {feedback.title}
-        {feedback.detail ? ` — ${feedback.detail}` : ''}
+      <p className={`min-h-[1.5rem] text-sm font-medium ${banner ? 'text-amber-300' : TONE[feedback.tone]}`} aria-live="polite">
+        {banner ?? `${feedback.title}${feedback.detail ? ` — ${feedback.detail}` : ''}`}
       </p>
     </div>
   );

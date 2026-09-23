@@ -3,10 +3,10 @@ import { Board, type MarkTone } from '../components/board/Board';
 import { feedbackFor, type Tone } from '../components/hud/feedback';
 import { TRAINING_RULES } from '../core/config';
 import { parseUci } from '../core/fen';
-import type { TablebaseLookup } from '../core/judge/tablebaseTypes';
 import { materialSignature } from '../core/material';
 import type { Puzzle } from '../core/types';
 import { usePuzzlePlayer } from '../hooks/usePuzzlePlayer';
+import type { MoveJudge } from '../services/moveJudge';
 
 const TONE_CLASS: Record<Tone, string> = {
   neutral: 'bg-stone-800 text-stone-100',
@@ -19,14 +19,13 @@ const TONE_CLASS: Record<Tone, string> = {
 interface Props {
   puzzle: Puzzle;
   position: { index: number; total: number };
-  lookup: TablebaseLookup;
-  prefetch: (fen: string) => void;
+  judge: MoveJudge;
   onNext: () => void;
   onHome: () => void;
 }
 
-export function GameScreen({ puzzle, position, lookup, prefetch, onNext, onHome }: Props) {
-  const { state, timings, playMove, reset } = usePuzzlePlayer(puzzle, TRAINING_RULES, lookup, prefetch);
+export function GameScreen({ puzzle, position, judge, onNext, onHome }: Props) {
+  const { state, timings, playMove, reset } = usePuzzlePlayer(puzzle, TRAINING_RULES, judge);
   const feedback = feedbackFor(state);
   const playerIsWhite = state.playerColor === 'w';
   const turnIsWhite = state.fen.split(' ')[1] === 'w';
@@ -36,14 +35,10 @@ export function GameScreen({ puzzle, position, lookup, prefetch, onNext, onHome 
     const list: { square: string; tone: MarkTone }[] = [];
     if (state.phase === 'failed' && state.verdict?.kind === 'bad' && state.lastMove) {
       list.push({ square: state.lastMove.to, tone: 'bad' });
-      const hint = state.verdict.bestUci[0];
-      if (hint) {
-        const { from, to } = parseUci(hint);
-        list.push({ square: from, tone: 'hint' }, { square: to, tone: 'hint' });
-      }
     }
     return list;
   }, [state.phase, state.verdict, state.lastMove]);
+  const arrow = state.phase === 'failed' && state.verdict?.kind === 'bad' && state.verdict.bestUci[0] ? parseUci(state.verdict.bestUci[0]) : null;
 
   // Numérotation des coups à partir du FEN de départ.
   const startMoveNumber = Number(puzzle.fen.split(' ')[5] ?? 1);
@@ -57,13 +52,14 @@ export function GameScreen({ puzzle, position, lookup, prefetch, onNext, onHome 
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start">
-      <div className="w-full lg:w-[min(640px,60vw)] shrink-0">
+      <div className="mx-auto w-full shrink-0 lg:mx-0 lg:w-[min(680px,60vw)]" style={{ maxWidth: 'min(100%, calc(100dvh - 120px))' }}>
         <Board
           fen={state.fen}
           orientation={state.playerColor}
           interactive={state.phase === 'awaitingPlayer'}
           lastMove={state.lastMove}
           marks={marks}
+          arrow={arrow}
           onMove={(from, to, promotion) => playMove(from, to, promotion)}
         />
       </div>
@@ -128,7 +124,8 @@ export function GameScreen({ puzzle, position, lookup, prefetch, onNext, onHome 
         </div>
 
         <p className="text-xs text-stone-500">
-          Verdict : {timings.verdictMs ?? '–'} ms · Réponse adverse : {timings.opponentMs ?? '–'} ms (table de finales Lichess)
+          Verdict : {timings.verdictMs ?? '–'} ms · Réponse adverse : {timings.opponentMs ?? '–'} ms
+          {timings.source && ` (${timings.source === 'tablebase' ? 'table de finales' : 'Stockfish'})`}
         </p>
       </aside>
     </div>

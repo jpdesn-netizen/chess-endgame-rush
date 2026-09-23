@@ -3,7 +3,9 @@ import { sideToMove } from '../core/fen';
 import { materialSignature } from '../core/material';
 import type { RushMode } from '../core/rush/rushRules';
 import type { Level, Puzzle } from '../core/types';
+import { useState } from 'react';
 import type { BestScore } from '../services/highScores';
+import { isSoundOn, setSoundOn } from '../services/sound';
 
 export type HomeMode = RushMode | 'training';
 export type ThemeChoice = 'mix' | 'bases' | 'pions' | 'tours' | 'dames' | 'fous' | 'cavaliers' | 'mixte';
@@ -33,6 +35,8 @@ const MODES: { id: HomeMode; icon: string; title: string; text: string }[] = [
 const LEVEL_LABEL: Record<Level, string> = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé', master: 'Master' };
 
 interface Props {
+  /** Affichage compact (intégration dans un site). */
+  compact?: boolean;
   mode: HomeMode;
   theme: ThemeChoice;
   startRating: number;
@@ -52,11 +56,26 @@ const chip = (active: boolean) =>
 
 export function HomeScreen(p: Props) {
   const rush = p.mode !== 'training';
+  const [sound, setSound] = useState(isSoundOn);
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-extrabold text-stone-50 sm:text-4xl">♔ Chess Endgame Rush</h1>
-        <p className="mt-2 text-stone-400">Finales jugées coup par coup par la table de finales Lichess.</p>
+    <div className={`mx-auto max-w-5xl px-4 ${p.compact ? 'py-4' : 'py-8'}`}>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className={`font-extrabold text-stone-50 ${p.compact ? 'text-2xl' : 'text-3xl sm:text-4xl'}`}>♔ Chess Endgame Rush</h1>
+          {!p.compact && <p className="mt-2 text-stone-400">Finales de parties réelles, jugées coup par coup (table de finales et Stockfish).</p>}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setSoundOn(!sound);
+            setSound(!sound);
+          }}
+          className="rounded-lg bg-stone-800 px-3 py-2 text-lg hover:bg-stone-700"
+          aria-label={sound ? 'Couper le son' : 'Activer le son'}
+          title={sound ? 'Couper le son' : 'Activer le son'}
+        >
+          {sound ? '🔊' : '🔇'}
+        </button>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
@@ -136,9 +155,12 @@ export function HomeScreen(p: Props) {
         </ul>
       )}
 
-      <footer className="mt-10 text-xs text-stone-500">
-        Positions de parties réelles : base de puzzles Lichess (licence CC0). Jugement : table de finales Syzygy via l’API Lichess.
-      </footer>
+      {!p.compact && (
+        <footer className="mt-10 text-xs text-stone-500">
+          Positions de parties réelles : base de puzzles Lichess (licence CC0). Jugement : table de finales Syzygy (API Lichess)
+          et Stockfish. Échiquier : chessground (Lichess). Logiciel sous licence GPL v3.
+        </footer>
+      )}
     </div>
   );
 }

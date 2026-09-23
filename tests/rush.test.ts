@@ -10,9 +10,20 @@ import { tbMove, tbPosition } from './fixtures';
 
 const entry = (success: boolean): RushEntry => ({ puzzleId: 'x', rating: 1000, success, title: 't' });
 const { durationMs, bonusMs, penaltyMs } = CONFIG.modes.storm;
+const go = (s: ReturnType<typeof startRush>) => rushReducer(s, { type: 'START', now: 0 });
+
+test('Storm : le chrono attend le premier coup', () => {
+  const s0 = startRush('storm', 800);
+  assert.equal(s0.status, 'waiting');
+  assert.equal(rushReducer(s0, { type: 'TICK', now: 10 * durationMs }).status, 'waiting');
+  assert.equal(remainingMs(s0, 999_999), durationMs);
+  const s1 = rushReducer(s0, { type: 'START', now: 5_000 });
+  assert.equal(s1.status, 'running');
+  assert.equal(remainingMs(s1, 5_000), durationMs);
+});
 
 test('Storm : +1 point et bonus de temps par réussite', () => {
-  const s0 = startRush('storm', 800, 0);
+  const s0 = go(startRush('storm', 800));
   const s1 = rushReducer(s0, { type: 'SOLVED', now: 1000, entry: entry(true) });
   assert.equal(s1.score, 1);
   assert.equal(s1.combo, 1);
@@ -20,7 +31,7 @@ test('Storm : +1 point et bonus de temps par réussite', () => {
 });
 
 test('Storm : pénalité de temps par erreur, combo remis à zéro', () => {
-  let s = startRush('storm', 800, 0);
+  let s = go(startRush('storm', 800));
   s = rushReducer(s, { type: 'SOLVED', now: 10, entry: entry(true) });
   s = rushReducer(s, { type: 'FAILED', now: 20, entry: entry(false) });
   assert.equal(s.errors, 1);
@@ -31,20 +42,20 @@ test('Storm : pénalité de temps par erreur, combo remis à zéro', () => {
 });
 
 test('Storm : fin quand le temps est écoulé, puis état figé', () => {
-  const s0 = startRush('storm', 800, 0);
+  const s0 = go(startRush('storm', 800));
   const over = rushReducer(s0, { type: 'TICK', now: durationMs });
   assert.equal(over.status, 'over');
   assert.equal(rushReducer(over, { type: 'SOLVED', now: durationMs + 1, entry: entry(true) }).score, 0);
 });
 
 test('Storm : une pénalité qui vide le chrono termine la partie', () => {
-  const s0 = startRush('storm', 800, 0);
+  const s0 = go(startRush('storm', 800));
   const s = rushReducer(s0, { type: 'FAILED', now: durationMs - 5_000, entry: entry(false) });
   assert.equal(s.status, 'over');
 });
 
 test('Streak : la difficulté monte à chaque réussite, fin à la 1re erreur', () => {
-  let s = startRush('streak', 1200, 0);
+  let s = go(startRush('streak', 1200));
   assert.equal(s.endsAt, null);
   s = rushReducer(s, { type: 'SOLVED', now: 1, entry: entry(true) });
   s = rushReducer(s, { type: 'SOLVED', now: 2, entry: entry(true) });

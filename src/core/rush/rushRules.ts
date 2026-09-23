@@ -17,7 +17,8 @@ export interface RushEntry {
 
 export interface RushState {
   mode: RushMode;
-  status: 'running' | 'over';
+  /** 'waiting' : partie prête, le chrono démarre au premier coup du joueur. */
+  status: 'waiting' | 'running' | 'over';
   startRating: number;
   score: number;
   errors: number;
@@ -29,20 +30,22 @@ export interface RushState {
 }
 
 export type RushEvent =
+  | { type: 'START'; now: number }
   | { type: 'SOLVED'; now: number; entry: RushEntry }
   | { type: 'FAILED'; now: number; entry: RushEntry }
   | { type: 'TICK'; now: number };
 
-export function startRush(mode: RushMode, startRating: number, now: number): RushState {
+/** Partie prête ; le chrono ne tourne qu'après l'événement START. */
+export function startRush(mode: RushMode, startRating: number): RushState {
   return {
     mode,
-    status: 'running',
+    status: 'waiting',
     startRating,
     score: 0,
     errors: 0,
     combo: 0,
     bestCombo: 0,
-    endsAt: mode === 'storm' ? now + CONFIG.modes.storm.durationMs : null,
+    endsAt: null,
     history: [],
   };
 }
@@ -54,11 +57,25 @@ export function targetRating(state: RushState): number {
 }
 
 export function remainingMs(state: RushState, now: number): number | null {
-  return state.endsAt === null ? null : Math.max(0, state.endsAt - now);
+  if (state.mode !== 'storm') return null;
+  if (state.endsAt === null) return CONFIG.modes.storm.durationMs; // pas encore démarré
+  return Math.max(0, state.endsAt - now);
 }
 
 export function rushReducer(state: RushState, event: RushEvent): RushState {
   if (state.status === 'over') return state;
+  if (event.type === 'START') {
+    if (state.status !== 'waiting') return state;
+    return {
+      ...state,
+      status: 'running',
+      endsAt: state.mode === 'storm' ? event.now + CONFIG.modes.storm.durationMs : null,
+    };
+  }
+  if (state.status === 'waiting') {
+    if (event.type === 'TICK') return state; // le chrono n'a pas démarré
+    state = rushReducer(state, { type: 'START', now: event.now });
+  }
   const timeUp = state.endsAt !== null && event.now >= state.endsAt;
   if (timeUp) return { ...state, status: 'over' };
 
