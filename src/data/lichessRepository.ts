@@ -1,5 +1,5 @@
 // Chargement des finales Lichess (public/data/lichess-endgames.json,
-// produit par scripts/import-lichess.mjs). Chargé une seule fois.
+// produit par scripts/import-lichess.ts). Chargé une seule fois.
 
 import { FAMILY_LABEL, familyOf } from '../core/material';
 import type { Family, Puzzle } from '../core/types';
@@ -15,6 +15,8 @@ interface RawPuzzle {
   pieces?: number;
   themes: string[];
   gameUrl: string;
+  /** Exercices générés avec la table de finales : Elo estimé. */
+  ratingEstimated?: boolean;
 }
 
 const THEME_FR: Record<string, string> = {
@@ -70,6 +72,23 @@ function levelOf(rating: number): Puzzle['level'] {
 function toPuzzle(raw: RawPuzzle): Puzzle {
   const family = raw.family ?? familyOf(raw.fen);
   const themes = raw.themes.filter((t) => !ENDGAME_THEME_KEYS.has(t)).map((t) => THEME_FR[t] ?? t);
+  if (raw.ratingEstimated) {
+    return {
+      id: raw.id,
+      title: `${FAMILY_LABEL[family]} · table de finales Lichess`,
+      fen: raw.fen,
+      objective: raw.objective,
+      collection: 'tablebase',
+      level: levelOf(raw.rating),
+      rating: raw.rating,
+      ratingEstimated: true,
+      concept: 'Position générée ; un seul coup juste, vérifié par la table de finales. Elo estimé.',
+      family,
+      lastMove: raw.lastMove || undefined,
+      solution: raw.solution,
+      themes: raw.themes,
+    };
+  }
   return {
     id: raw.id,
     title: `${FAMILY_LABEL[family]}${(raw.pieces ?? 0) > 7 ? ' (longue)' : ''} · Lichess`,
@@ -89,14 +108,27 @@ function toPuzzle(raw: RawPuzzle): Puzzle {
 
 let cache: Promise<Puzzle[]> | null = null;
 
+async function fetchPuzzles(file: string, optional: boolean): Promise<RawPuzzle[]> {
+  const r = await fetch(`${import.meta.env.BASE_URL}data/${file}`);
+  if (!r.ok) {
+    if (optional) return [];
+    throw new Error(`Chargement des finales Lichess impossible (HTTP ${r.status}).`);
+  }
+  const data = (await r.json()) as { puzzles: RawPuzzle[] };
+  return data.puzzles;
+}
+
+/**
+ * Finales Lichess (puzzles, Elo Lichess) + exercices générés avec la table de
+ * finales (fichier facultatif, Elo estimé) pour les sous-thèmes trop pauvres.
+ */
 export function loadLichessPuzzles(): Promise<Puzzle[]> {
   if (!cache) {
-    cache = fetch(`${import.meta.env.BASE_URL}data/lichess-endgames.json`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Chargement des finales Lichess impossible (HTTP ${r.status}).`);
-        return r.json() as Promise<{ puzzles: RawPuzzle[] }>;
-      })
-      .then((data) => data.puzzles.map(toPuzzle))
+    cache = Promise.all([
+      fetchPuzzles('lichess-endgames.json', false),
+      fetchPuzzles('tablebase-endgames.json', true).catch(() => []),
+    ])
+      .then(([lichess, generated]) => [...lichess, ...generated].map(toPuzzle))
       .catch((error) => {
         cache = null;
         throw error;

@@ -11,7 +11,7 @@ export type Level = 'debutant' | 'intermediaire' | 'avance' | 'master';
 export type Family = 'pions' | 'tours' | 'dames' | 'cavaliers' | 'fous' | 'mixte' | 'mats';
 
 /** Collection d'origine d'un puzzle. */
-export type Collection = 'bases' | 'lichess';
+export type Collection = 'bases' | 'lichess' | 'tablebase';
 
 export interface Puzzle {
   id: string;
@@ -21,8 +21,10 @@ export interface Puzzle {
   objective: Objective;
   collection: Collection;
   level: Level;
-  /** Estimation Elo — sert à la montée de difficulté (Streak). */
+  /** Elo — sert à la montée de difficulté (Storm / Streak). */
   rating: number;
+  /** Elo ESTIMÉ (exercice généré, jamais joué sur Lichess) : affiché « ≈ ». */
+  ratingEstimated?: boolean;
   /** Idée clé affichée au joueur. */
   concept: string;
   /** Famille de finale (calculée si absente). */

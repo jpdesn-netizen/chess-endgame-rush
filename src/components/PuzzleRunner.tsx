@@ -71,7 +71,11 @@ export function PuzzleRunner({ puzzle, active, judge, onEnd, onPlayerMove, banne
           </span>
         </span>
         <span className="text-stone-400">
-          Elo {puzzle.rating} · coup {Math.min(state.playerMoveCount + (state.phase === 'awaitingPlayer' ? 1 : 0), rules.maxPlayerMoves ?? 1)}/
+          <span title={puzzle.ratingEstimated ? 'Elo estimé : exercice généré, pas encore noté par Lichess' : 'Elo Lichess'}>
+            Elo {puzzle.ratingEstimated ? '≈' : ''}
+            {puzzle.rating}
+          </span>{' '}
+          · coup {Math.min(state.playerMoveCount + (state.phase === 'awaitingPlayer' ? 1 : 0), rules.maxPlayerMoves ?? 1)}/
           {rules.maxPlayerMoves}
         </span>
       </div>
