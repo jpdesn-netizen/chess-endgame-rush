@@ -135,12 +135,11 @@ export function HomeScreen(p: Props) {
                 <button type="button" className={subChip(p.sub === 'all')} onClick={() => p.onSub('all')}>
                   Tous <Count n={p.counts.get(p.theme)} />
                 </button>
-                {SUBCATEGORIES.filter((s) => s.family === p.theme).map((s) => (
+                {SUBCATEGORIES.filter((s) => s.family === p.theme && (p.counts.get(s.id) ?? 0) >= CONFIG.minPuzzlesPerTheme).map((s) => (
                   <button
                     key={s.id}
                     type="button"
                     title={s.title}
-                    disabled={!p.counts.get(s.id)}
                     className={subChip(p.sub === s.id)}
                     onClick={() => p.onSub(s.id)}
                   >
@@ -149,7 +148,7 @@ export function HomeScreen(p: Props) {
                 ))}
                 <button
                   type="button"
-                  disabled={!p.counts.get(`${p.theme}-autres`)}
+                  disabled={(p.counts.get(`${p.theme}-autres`) ?? 0) < CONFIG.minPuzzlesPerTheme}
                   className={subChip(p.sub === `${p.theme}-autres`)}
                   onClick={() => p.onSub(`${p.theme}-autres`)}
                 >

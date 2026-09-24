@@ -76,6 +76,43 @@ test('sélection : proche de l’Elo visé, jamais deux fois le même', () => {
   assert.equal(pickNext(pool, 1000, new Set(['a', 'b', 'c', 'd'])), null);
 });
 
+test('sélection : une partie entière sans aucun doublon, ordre variable', () => {
+  const pool = Array.from({ length: 150 }, (_, i) => ({ ...P(`p${i}`, 800 + i * 10), subcategory: i % 2 ? 'rp-r' : 'r-p' }));
+  const play = (seed: number) => {
+    let x = seed;
+    const rnd = () => ((x = (x * 9301 + 49297) % 233280) / 233280);
+    const seen = new Set<string>();
+    const order: string[] = [];
+    let prev: string | undefined;
+    for (let k = 0; k < 150; k++) {
+      const p = pickNext(pool, 800 + k * 20, seen, rnd, { previousSubcategory: prev })!;
+      assert.ok(!seen.has(p.id), 'doublon');
+      seen.add(p.id);
+      order.push(p.id);
+      prev = p.subcategory;
+    }
+    assert.equal(pickNext(pool, 1000, seen), null); // réservoir épuisé, jamais de répétition
+    return order.join();
+  };
+  assert.notEqual(play(1), play(2)); // deux parties : deux ordres différents
+});
+
+test('sélection : évite le sous-thème précédent et les puzzles vus récemment', () => {
+  const pool = [
+    ...Array.from({ length: 6 }, (_, i) => ({ ...P(`a${i}`, 1000 + i), subcategory: 'rp-r' })),
+    ...Array.from({ length: 6 }, (_, i) => ({ ...P(`b${i}`, 1000 + i), subcategory: 'r-p' })),
+  ];
+  for (let k = 0; k < 20; k++) {
+    const p = pickNext(pool, 1000, new Set(), Math.random, { previousSubcategory: 'rp-r' })!;
+    assert.equal(p.subcategory, 'r-p');
+  }
+  const recent = new Set(['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'a0']);
+  for (let k = 0; k < 20; k++) {
+    const p = pickNext(pool, 1000, new Set(), Math.random, { recentlySeen: recent })!;
+    assert.ok(!recent.has(p.id));
+  }
+});
+
 test('rushRules : longueur de la ligne Lichess, plafonnée à 6 coups', () => {
   assert.equal(rushRules(['a', 'b', 'c']).maxPlayerMoves, 2);
   assert.equal(rushRules(new Array(20).fill('x')).maxPlayerMoves, 6);

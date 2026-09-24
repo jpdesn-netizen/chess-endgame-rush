@@ -21,6 +21,8 @@ interface Props {
   /** Archivage (profil joueur) : un puzzle terminé. */
   onAttempt?: (puzzle: Puzzle, success: boolean) => void;
   /** Archivage : une partie terminée. */
+  /** Puzzles joués lors des parties récentes : évités tant qu'il reste du choix. */
+  recentlySeen?: ReadonlySet<string>;
   onRunEnd?: (run: { mode: RushMode; theme: string; level: number; score: number; errors: number; bestCombo: number; highest?: number; played?: number; moves?: number; durationMs?: number }) => void;
   onRestart: () => void;
   onHome: () => void;
@@ -34,13 +36,14 @@ function formatTime(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, onAttempt, onRunEnd, onRestart, onHome }: Props) {
+export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, recentlySeen, onAttempt, onRunEnd, onRestart, onHome }: Props) {
   const [rush, setRush] = useState<RushState>(() => startRush(mode, startRating));
   const [current, setCurrent] = useState<Puzzle | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState<{ isRecord: boolean; previous: BestScore | null } | null>(null);
-  const excluded = useRef(new Set<string>());
+  const excluded = useRef(new Set<string>()); // puzzles déjà servis dans CETTE partie : jamais redonnés
+  const lastSub = useRef<string | undefined>(undefined);
   const nextPuzzle = useRef<Promise<Puzzle | null> | null>(null);
   const rushRef = useRef(rush);
   rushRef.current = rush;
@@ -51,18 +54,22 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, on
   const findPlayable = useCallback(
     async (target: number): Promise<Puzzle | null> => {
       for (let attempt = 0; attempt < 8; attempt += 1) {
-        const candidate = pickNext(pool, target, excluded.current);
+        const candidate = pickNext(pool, target, excluded.current, Math.random, {
+          previousSubcategory: lastSub.current,
+          recentlySeen,
+        });
         if (!candidate) return null;
         excluded.current.add(candidate.id);
         if (await judge.check(candidate.fen, candidate.objective)) {
           // Préchargement : le premier verdict sera immédiat.
           judge.prefetch(candidate.fen, { objective: candidate.objective, previousUci: [], solution: candidate.solution });
+          lastSub.current = candidate.subcategory;
           return candidate;
         }
       }
       return null;
     },
-    [pool, judge],
+    [pool, judge, recentlySeen],
   );
 
   // Préparation du premier puzzle. Le chrono attend le premier coup du joueur.

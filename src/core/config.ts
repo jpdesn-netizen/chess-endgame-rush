@@ -2,6 +2,12 @@
 // ensemble sont regroupées ici pour pouvoir les ajuster sans toucher au code.
 
 export const CONFIG = {
+  /**
+   * Un thème ou sous-thème n'est proposé que s'il compte au moins autant
+   * d'exercices : une partie ne répète jamais un exercice, il faut donc
+   * un réservoir suffisant à tous les niveaux.
+   */
+  minPuzzlesPerTheme: 100,
   tablebase: {
     url: 'https://tablebase.lichess.ovh/standard',
     /** Les tables Syzygy couvrent jusqu'à 7 pièces (rois compris). */

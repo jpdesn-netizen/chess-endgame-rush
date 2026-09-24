@@ -71,8 +71,10 @@ export default function App() {
     return map;
   }, [lichess]);
 
-  const pool = useMemo(() => (lichess ? buildPool(theme, sub, lichess) : null), [theme, sub, lichess]);
-  const themeKey = sub === 'all' ? theme : `${theme}/${sub}`;
+  // Sous-thème trop pauvre (< minPuzzlesPerTheme, ex. lien ▶ ou intégration) : on joue toute la famille.
+  const effSub = sub === 'all' || !lichess || (counts.get(sub) ?? 0) >= CONFIG.minPuzzlesPerTheme ? sub : 'all';
+  const pool = useMemo(() => (lichess ? buildPool(theme, effSub, lichess) : null), [theme, effSub, lichess]);
+  const themeKey = effSub === 'all' ? theme : `${theme}/${effSub}`;
   const key = mode === 'training' ? '' : scoreKey(mode, `${playerId ?? 'invite'}|${themeKey}`, startRating);
   const shell = (content: ReactNode) => <main className="min-h-dvh bg-stone-900 text-stone-100">{content}</main>;
 
@@ -110,6 +112,14 @@ export default function App() {
   useEffect(() => {
     if (account.recovery) setScreen({ name: 'progress' });
   }, [account.recovery]);
+
+  // Puzzles des parties récentes du joueur (évités tant qu'il reste du choix).
+  const recentlySeen = useMemo(
+    () => new Set(playerId ? playerStore.history(playerId).attempts.slice(-1500).map((a) => a.p) : []),
+    // Recalculé à chaque nouvelle partie.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [playerId, screen],
+  );
 
   const playerName = playerStore.listPlayers().find((p) => p.id === playerId)?.name ?? null;
 
@@ -155,6 +165,7 @@ export default function App() {
         startRating={startRating}
         scoreKey={key}
         judge={judge}
+        recentlySeen={recentlySeen}
         onAttempt={onRushAttempt}
         onRunEnd={onRunEnd}
         onRestart={() => setScreen({ name: 'rush', run: screen.run + 1 })}
