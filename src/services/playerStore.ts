@@ -29,6 +29,14 @@ export interface Run {
   score: number;
   errors: number;
   bestCombo: number;
+  /** Elo du puzzle le plus difficile réussi (absent sur les parties antérieures à la v0.4). */
+  highest?: number;
+  /** Nombre de puzzles joués dans la partie (idem). */
+  played?: number;
+  /** Coups joués par le joueur (idem) : sert à la précision façon Lichess. */
+  moves?: number;
+  /** Durée réelle, du 1er coup à la fin (ms). */
+  durationMs?: number;
 }
 
 export interface PlayerHistory {

@@ -12,7 +12,7 @@ import { ProgressScreen } from './screens/ProgressScreen';
 import { RushScreen } from './screens/RushScreen';
 import { getBest, scoreKey } from './services/highScores';
 import { judge } from './services/judge';
-import { playerStore } from './services/playerStore';
+import { type Run, playerStore } from './services/playerStore';
 
 type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' };
 
@@ -85,7 +85,7 @@ export default function App() {
   const onRushAttempt = useCallback((p: Puzzle, ok: boolean) => onAttempt(p, ok, mode === 'streak' ? 'streak' : 'storm'), [onAttempt, mode]);
   const onTrainingAttempt = useCallback((p: Puzzle, ok: boolean) => onAttempt(p, ok, 'training'), [onAttempt]);
   const onRunEnd = useCallback(
-    (run: { mode: 'storm' | 'streak'; theme: string; level: number; score: number; errors: number; bestCombo: number }) => {
+    (run: Omit<Run, 't'>) => {
       if (playerId) playerStore.addRun(playerId, { t: Date.now(), ...run });
     },
     [playerId],
@@ -100,8 +100,8 @@ export default function App() {
         playerId={playerId}
         onPlayerChange={changePlayer}
         onHome={() => setScreen({ name: 'home' })}
-        onTrain={(family, subcategory) => {
-          setMode('storm');
+        onTrain={(family, subcategory, m = 'storm') => {
+          setMode(m);
           setTheme(family as ThemeChoice);
           setSub(subcategory);
           setScreen({ name: 'rush', run: Date.now() });

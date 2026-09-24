@@ -2,10 +2,11 @@
 // sous-thème, points faibles (avec accès direct à l'entraînement ciblé).
 
 import { useMemo, useRef, useState } from 'react';
-import { CategoryBars } from '../components/charts/CategoryBars';
+import { ScoreDashboard } from '../components/ScoreDashboard';
+import { TypeProfile } from '../components/TypeProfile';
 import { ScoreChart } from '../components/charts/ScoreChart';
 import { FAMILY_LABEL } from '../core/material';
-import { filterAttempts, scoreSeries, statsByCategory, totals, weaknesses, type CategoryStat } from '../core/stats';
+import { filterAttempts, scoreSeries, totals } from '../core/stats';
 import type { Family } from '../core/types';
 import type { PlayerStore } from '../services/playerStore';
 
@@ -13,7 +14,7 @@ interface Props {
   store: PlayerStore;
   playerId: string | null;
   onPlayerChange: (id: string | null) => void;
-  onTrain: (family: string, subcategory: string) => void;
+  onTrain: (family: string, subcategory: string, mode?: 'storm' | 'streak') => void;
   onHome: () => void;
 }
 
@@ -50,9 +51,6 @@ export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHom
     () => filterAttempts(history.attempts, { mode: mode || undefined, family: family || undefined, sinceMs: since ? Date.now() - since : undefined }),
     [history, mode, family, since],
   );
-  const byCat = useMemo(() => statsByCategory(filtered), [filtered]);
-  const weak = useMemo(() => weaknesses(byCat, 5), [byCat]);
-  const all = useMemo(() => [...byCat].sort((a, b) => a.rate - b.rate), [byCat]);
   const tot = totals(filtered);
   const series = useMemo(
     () => scoreSeries(history.runs.filter((r) => !since || r.t >= Date.now() - since), chartMode),
@@ -89,7 +87,6 @@ export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHom
     }
   };
 
-  const train = (s: CategoryStat) => onTrain(s.family, s.id.endsWith('-autres') ? 'all' : s.id);
   const current = players.find((p) => p.id === playerId) ?? null;
 
   return (
@@ -177,6 +174,19 @@ export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHom
         <p className="text-stone-400">Créez ou choisissez un joueur pour archiver vos parties et suivre vos progrès.</p>
       ) : (
         <>
+          {/* Scores façon lichess.org/storm/dashboard : performances isolées, sans cumul */}
+          <ScoreDashboard
+            runs={history.runs}
+            onReplay={(m, themeKey) => {
+              const [fam, sub] = themeKey.split('/');
+              onTrain(fam, sub ?? 'all', m);
+            }}
+          />
+
+          {/* Points faibles par type de finale : radars + classement */}
+          <TypeProfile attempts={history.attempts} onTrain={(f, s) => onTrain(f, s)} />
+
+          <h2 className="mt-2 text-sm font-semibold uppercase tracking-wide text-stone-400">Statistiques d’entraînement</h2>
           {/* Filtres : une seule rangée, au-dessus des graphiques */}
           <div className="flex flex-wrap gap-2">
             {MODES.map((m) => (
@@ -221,19 +231,6 @@ export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHom
             <ScoreChart points={series} title={`Évolution du score ${chartMode === 'storm' ? 'Storm' : 'Streak'}`} />
           </section>
 
-          {/* Points faibles */}
-          <section className="flex flex-col gap-3">
-            <h2 className="text-lg font-bold text-stone-50">🎯 Points faibles</h2>
-            <p className="text-xs text-stone-500">Sous-thèmes joués au moins 5 fois, du plus faible au plus fort. ▶ lance un Storm sur ce thème.</p>
-            <CategoryBars stats={weak.slice(0, 8)} onTrain={train} />
-          </section>
-
-          <details className="rounded-xl bg-stone-800/40 p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-stone-200">Tous les sous-thèmes ({all.length})</summary>
-            <div className="mt-3">
-              <CategoryBars stats={all} onTrain={train} />
-            </div>
-          </details>
         </>
       )}
     </div>

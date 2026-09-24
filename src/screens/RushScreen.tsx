@@ -21,7 +21,7 @@ interface Props {
   /** Archivage (profil joueur) : un puzzle terminé. */
   onAttempt?: (puzzle: Puzzle, success: boolean) => void;
   /** Archivage : une partie terminée. */
-  onRunEnd?: (run: { mode: RushMode; theme: string; level: number; score: number; errors: number; bestCombo: number }) => void;
+  onRunEnd?: (run: { mode: RushMode; theme: string; level: number; score: number; errors: number; bestCombo: number; highest?: number; played?: number; moves?: number; durationMs?: number }) => void;
   onRestart: () => void;
   onHome: () => void;
 }
@@ -44,6 +44,8 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, on
   const nextPuzzle = useRef<Promise<Puzzle | null> | null>(null);
   const rushRef = useRef(rush);
   rushRef.current = rush;
+  const movesRef = useRef(0); // coups joués (précision façon Lichess)
+  const startedAtRef = useRef<number | null>(null);
 
   /** Tire un puzzle et vérifie (table ou moteur) que l'objectif annoncé est juste. */
   const findPlayable = useCallback(
@@ -100,14 +102,31 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, on
   useEffect(() => {
     if (rush.status !== 'over' || result) return;
     setResult(submitScore(scoreKey, rush.score));
-    const run = { mode, theme, level: startRating, score: rush.score, bestCombo: rush.bestCombo, errors: rush.errors };
+    const solvedRatings = rush.history.filter((h) => h.success).map((h) => h.rating);
+    const run = {
+      mode,
+      theme,
+      level: startRating,
+      score: rush.score,
+      bestCombo: rush.bestCombo,
+      errors: rush.errors,
+      highest: solvedRatings.length ? Math.max(...solvedRatings) : undefined,
+      played: rush.history.length,
+      moves: movesRef.current,
+      durationMs:
+        startedAtRef.current === null
+          ? undefined
+          : Math.max(0, Math.min(Date.now(), rush.endsAt ?? Infinity) - startedAtRef.current),
+    };
     notifyParent(run);
     if (rush.history.length > 0) onRunEnd?.(run);
   }, [rush, result, scoreKey, mode, theme, startRating, onRunEnd]);
 
   const onPlayerMove = useCallback(() => {
+    if (rushRef.current.status !== 'over') movesRef.current += 1;
     if (rushRef.current.status === 'waiting') {
       const t = Date.now();
+      startedAtRef.current = t;
       setNow(t);
       setRush((r) => rushReducer(r, { type: 'START', now: t }));
     }
