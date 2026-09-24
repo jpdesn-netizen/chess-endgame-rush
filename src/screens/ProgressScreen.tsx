@@ -45,6 +45,7 @@ export function ProgressScreen({ store, account, playerId, onPlayerChange, onTra
   const [period, setPeriod] = useState('all');
   const [chartMode, setChartMode] = useState<'storm' | 'streak'>('storm');
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const players = useMemo(() => store.listPlayers(), [store, version, playerId, account.lastSync]);
@@ -116,6 +117,9 @@ export function ProgressScreen({ store, account, playerId, onPlayerChange, onTra
           <button type="button" className={chip(playerId === null)} onClick={() => onPlayerChange(null)}>
             Invité (non archivé)
           </button>
+          {players.length > 0 && !current && (
+            <span className="self-center text-xs text-stone-500">Cliquez sur un profil pour le sélectionner, l’exporter ou le supprimer.</span>
+          )}
         </div>
         <form
           className="flex flex-wrap gap-2"
@@ -153,21 +157,32 @@ export function ProgressScreen({ store, account, playerId, onPlayerChange, onTra
               e.target.value = '';
             }}
           />
-          {current && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`Supprimer « ${current.name} » et tout son historique ?`)) {
-                  store.deletePlayer(current.id);
-                  onPlayerChange(null);
-                  setVersion((v) => v + 1);
-                }
-              }}
-              className="text-red-400 hover:underline"
-            >
-              🗑 Supprimer ce joueur
-            </button>
-          )}
+          {current &&
+            (confirmDelete ? (
+              <span className="flex flex-wrap items-center gap-2 text-red-300">
+                Supprimer « {current.name} » et tout son historique sur cet appareil ?
+                <button
+                  type="button"
+                  onClick={() => {
+                    store.deletePlayer(current.id);
+                    setConfirmDelete(false);
+                    onPlayerChange(null);
+                    setVersion((v) => v + 1);
+                    setMessage(`Profil « ${current.name} » supprimé.`);
+                  }}
+                  className="rounded-md bg-red-600 px-2 py-0.5 font-semibold text-white hover:bg-red-500"
+                >
+                  Oui, supprimer
+                </button>
+                <button type="button" onClick={() => setConfirmDelete(false)} className="rounded-md bg-stone-700 px-2 py-0.5 text-stone-100">
+                  Annuler
+                </button>
+              </span>
+            ) : (
+              <button type="button" onClick={() => setConfirmDelete(true)} className="text-red-400 hover:underline">
+                🗑 Supprimer ce joueur
+              </button>
+            ))}
         </div>
         {message && <p className="text-sm text-amber-300">{message}</p>}
         <p className="text-xs text-stone-500">

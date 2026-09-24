@@ -33,6 +33,11 @@ export function authErrorMessage(error: unknown): string {
   if (code === 'captcha_failed') return 'Vérification anti-robot échouée. Réessayez.';
   if (code === 'mfa_verification_failed' || code === 'mfa_challenge_expired') return 'Code de vérification incorrect ou expiré.';
   if (code === 'same_password') return 'Le nouveau mot de passe doit être différent de l’ancien.';
+  // Renvoyé seulement quand le mot de passe est correct : ne révèle rien à un tiers.
+  if (code === 'email_not_confirmed') return 'Compte pas encore confirmé : cliquez sur le lien reçu par email (pensez aux spams).';
+  // Envoi d'email refusé par le serveur (ex. service d'email pas encore configuré).
+  if (code === 'email_address_not_authorized' || code === 'email_provider_disabled' || code === 'signup_disabled' || (e?.status ?? 0) >= 500)
+    return 'Création de compte ou envoi d’email impossible pour le moment. Réessayez plus tard.';
   return 'Identifiants incorrects, ou compte pas encore confirmé par email.';
 }
 
