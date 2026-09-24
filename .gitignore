@@ -11,3 +11,6 @@ public/stockfish
 # Configuration locale (ne jamais commiter de clé secrète)
 .env.local
 .env.*.local
+
+# Recueils PGN personnels (droits d'auteur : jamais dans le dépôt ni le site)
+pgn-import/
