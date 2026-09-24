@@ -9,40 +9,9 @@ export interface Player {
   createdAt: string; // ISO
 }
 
-/** Un puzzle tenté (format compact : l'historique peut devenir long). */
-export interface Attempt {
-  t: number; // horodatage (ms)
-  m: 'storm' | 'streak' | 'training';
-  p: string; // identifiant du puzzle
-  r: number; // Elo du puzzle
-  c: string; // sous-catégorie (ex. « rp-r », « tours-autres »)
-  f: string; // famille
-  ok: boolean;
-}
+import { mergeHistories, sanitizeHistory, type Attempt, type PlayerHistory, type Run } from '../core/history';
 
-/** Une partie Storm / Streak terminée. */
-export interface Run {
-  t: number;
-  mode: 'storm' | 'streak';
-  theme: string;
-  level: number;
-  score: number;
-  errors: number;
-  bestCombo: number;
-  /** Elo du puzzle le plus difficile réussi (absent sur les parties antérieures à la v0.4). */
-  highest?: number;
-  /** Nombre de puzzles joués dans la partie (idem). */
-  played?: number;
-  /** Coups joués par le joueur (idem) : sert à la précision façon Lichess. */
-  moves?: number;
-  /** Durée réelle, du 1er coup à la fin (ms). */
-  durationMs?: number;
-}
-
-export interface PlayerHistory {
-  attempts: Attempt[];
-  runs: Run[];
-}
+export type { Attempt, PlayerHistory, Run };
 
 export interface PlayerStore {
   listPlayers(): Player[];
@@ -56,9 +25,14 @@ export interface PlayerStore {
   addRun(id: string, run: Run): void;
   /** Sauvegarde complète d'un joueur (fichier JSON). */
   exportPlayer(id: string): string;
-  /** Restaure une sauvegarde ; renvoie le joueur importé. */
+  /** Restaure une sauvegarde ; renvoie le joueur importé et le nombre d'entrées écartées. */
   importPlayer(json: string): Player;
+  /** Ajoute des entrées venues d'ailleurs (compte en ligne), sans doublon. */
+  mergeHistory(id: string, extra: PlayerHistory): number;
 }
+
+/** Taille maximale d'une sauvegarde importée (protège le navigateur). */
+export const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 
 const PREFIX = 'endgameRush:v1:';
 const MAX_ATTEMPTS = 20_000; // au-delà, les plus anciens sont effacés (limite du navigateur)
@@ -150,21 +124,46 @@ export function createLocalPlayerStore(): PlayerStore {
     },
 
     importPlayer(json) {
-      const data = JSON.parse(json) as { format?: string; player?: Player; history?: PlayerHistory };
-      if (data.format !== 'chess-endgame-rush/player@1' || !data.player || !data.history) {
+      if (json.length > MAX_IMPORT_BYTES) throw new Error('Fichier trop volumineux.');
+      let data: { format?: unknown; player?: { id?: unknown; name?: unknown; createdAt?: unknown }; history?: unknown };
+      try {
+        data = JSON.parse(json);
+      } catch {
+        throw new Error('Fichier de sauvegarde illisible.');
+      }
+      const src = data?.player;
+      if (
+        data?.format !== 'chess-endgame-rush/player@1' ||
+        !src ||
+        typeof src.id !== 'string' ||
+        !/^p_[a-z0-9_]{4,40}$/.test(src.id) ||
+        typeof src.name !== 'string'
+      ) {
         throw new Error('Fichier de sauvegarde non reconnu.');
       }
-      const existing = players().find((p) => p.id === data.player!.id);
-      const player = existing ?? { ...data.player, name: cleanName(data.player.name) };
+      // Seules les entrées valides sont gardées (types et bornes contrôlés).
+      const { history } = sanitizeHistory(data.history);
+      const existing = players().find((p) => p.id === src.id);
+      const player: Player = existing ?? {
+        id: src.id,
+        name: cleanName(src.name),
+        createdAt: typeof src.createdAt === 'string' && !Number.isNaN(Date.parse(src.createdAt)) ? src.createdAt : new Date().toISOString(),
+      };
       if (!existing) write('players', [...players(), player]);
       write(`history:${player.id}`, {
-        attempts: (data.history.attempts ?? []).slice(-MAX_ATTEMPTS),
-        runs: data.history.runs ?? [],
+        attempts: history.attempts.slice(-MAX_ATTEMPTS),
+        runs: history.runs,
       });
       return player;
+    },
+
+    mergeHistory(id, extra) {
+      const { history, added } = mergeHistories(store.history(id), sanitizeHistory(extra).history);
+      if (added > 0) write(`history:${id}`, { ...history, attempts: history.attempts.slice(-MAX_ATTEMPTS) });
+      return added;
     },
   };
   return store;
 }
 
-export const playerStore = createLocalPlayerStore();
+export const localPlayerStore = createLocalPlayerStore();

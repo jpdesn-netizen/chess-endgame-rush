@@ -12,7 +12,9 @@ import { ProgressScreen } from './screens/ProgressScreen';
 import { RushScreen } from './screens/RushScreen';
 import { getBest, scoreKey } from './services/highScores';
 import { judge } from './services/judge';
-import { type Run, playerStore } from './services/playerStore';
+import { useCloudAccount } from './hooks/useCloudAccount';
+import type { Run } from './services/playerStore';
+import { playerStore } from './services/players';
 
 type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' };
 
@@ -25,11 +27,23 @@ function classify(p: Puzzle): Puzzle {
 }
 const BASICS = PUZZLES_MOCK.map(classify);
 
+/**
+ * Sous-thèmes exacts couverts par les « Bases » (Lucena, Philidor, dame contre
+ * pion…). Les catégories fourre-tout « -autres » sont exclues : elles
+ * mélangeraient des milliers de finales sans rapport avec les bases.
+ */
+const BASICS_SUBS = new Set(BASICS.map((p) => p.subcategory).filter((s) => s && !s.endsWith('-autres')));
+
+/**
+ * Puzzles des modes classés (Storm / Streak) : uniquement la base Lichess,
+ * dont l'Elo est calculé par Lichess (Glicko-2). Les « Bases », à l'Elo
+ * seulement estimé, restent réservées à l'entraînement ; le thème « Bases »
+ * tire donc des puzzles Lichess de même matériel.
+ */
 function buildPool(theme: ThemeChoice, sub: string, lichess: Puzzle[]): Puzzle[] {
-  if (theme === 'bases') return BASICS;
-  const all = [...BASICS, ...lichess];
-  if (theme === 'mix') return all;
-  return all.filter((p) => p.family === theme && (sub === 'all' || p.subcategory === sub));
+  if (theme === 'bases') return lichess.filter((p) => BASICS_SUBS.has(p.subcategory));
+  if (theme === 'mix') return lichess;
+  return lichess.filter((p) => p.family === theme && (sub === 'all' || p.subcategory === sub));
 }
 
 export default function App() {
@@ -50,7 +64,7 @@ export default function App() {
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const p of [...BASICS, ...(lichess ?? [])]) {
+    for (const p of lichess ?? []) {
       map.set(p.family!, (map.get(p.family!) ?? 0) + 1);
       map.set(p.subcategory!, (map.get(p.subcategory!) ?? 0) + 1);
     }
@@ -91,12 +105,19 @@ export default function App() {
     [playerId],
   );
 
+  const account = useCloudAccount(playerStore, playerId, changePlayer);
+  // Arrivée par le lien « mot de passe oublié » : ouvrir l'écran du compte.
+  useEffect(() => {
+    if (account.recovery) setScreen({ name: 'progress' });
+  }, [account.recovery]);
+
   const playerName = playerStore.listPlayers().find((p) => p.id === playerId)?.name ?? null;
 
   if (screen.name === 'progress') {
     return shell(
       <ProgressScreen
         store={playerStore}
+        account={account}
         playerId={playerId}
         onPlayerChange={changePlayer}
         onHome={() => setScreen({ name: 'home' })}

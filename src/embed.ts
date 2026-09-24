@@ -9,6 +9,7 @@
 // En fin de partie, l'appli envoie au site parent un message
 //   { type: 'cer:result', mode, theme, level, score, bestCombo, errors }
 // (window.postMessage), que le site peut écouter pour afficher le score.
+// Le site parent doit figurer dans VITE_PARENT_ORIGINS (fichier .env.production).
 
 export interface EmbedOptions {
   embed: boolean;
@@ -36,10 +37,34 @@ export function readEmbedOptions(search: string = window.location.search): Embed
   };
 }
 
+/** Origines autorisées à recevoir les scores (VITE_PARENT_ORIGINS). */
+const ALLOWED_PARENTS = (import.meta.env?.VITE_PARENT_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter((o) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o));
+
+/** Origine du site qui intègre l'appli (null si inconnue). */
+function parentOrigin(): string | null {
+  const ancestors = (window.location as Location & { ancestorOrigins?: DOMStringList }).ancestorOrigins;
+  if (ancestors && ancestors.length > 0) return ancestors[0];
+  try {
+    return document.referrer ? new URL(document.referrer).origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Envoie le score au site parent, UNIQUEMENT s'il fait partie des origines
+ * autorisées (jamais à « * » : un site inconnu qui intégrerait l'appli ne
+ * reçoit rien).
+ */
 export function notifyParent(message: Record<string, unknown>): void {
   if (window.parent === window) return;
+  const origin = parentOrigin();
+  if (!origin || !ALLOWED_PARENTS.includes(origin)) return;
   try {
-    window.parent.postMessage({ type: 'cer:result', ...message }, '*');
+    window.parent.postMessage({ type: 'cer:result', ...message }, origin);
   } catch {
     /* site parent inaccessible : sans conséquence */
   }

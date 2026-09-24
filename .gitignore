@@ -8,3 +8,6 @@ lichess_db_puzzle.csv.zst
 _types.tgz
 scripts/.work
 public/stockfish
+# Configuration locale (ne jamais commiter de clé secrète)
+.env.local
+.env.*.local

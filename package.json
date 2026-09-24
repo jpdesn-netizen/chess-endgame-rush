@@ -1,7 +1,7 @@
 {
   "name": "chess-endgame-rush",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Entraînement aux finales d'échecs façon Puzzle Storm / Streak, jugé par table de finales",
   "type": "module",
   "scripts": {
@@ -11,27 +11,28 @@
     "prebuild": "node scripts/copy-stockfish.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx --test tests/fen.test.ts tests/material.test.ts tests/judge.test.ts tests/opponent.test.ts tests/chessRules.test.ts tests/session.test.ts tests/puzzles.test.ts tests/tablebaseClient.test.ts tests/rush.test.ts tests/engine.test.ts tests/stats.test.ts",
+    "test": "tsx --test tests/fen.test.ts tests/material.test.ts tests/judge.test.ts tests/opponent.test.ts tests/chessRules.test.ts tests/session.test.ts tests/puzzles.test.ts tests/tablebaseClient.test.ts tests/rush.test.ts tests/engine.test.ts tests/stats.test.ts tests/history.test.ts tests/securityHeaders.test.ts",
     "verify:puzzles": "tsx scripts/verify-puzzles.ts",
-    "import:lichess": "node scripts/import-lichess.mjs lichess_db_puzzle.csv/lichess_db_puzzle.csv"
+    "import:lichess": "node scripts/import-lichess.mjs lichess_db_puzzle.csv/lichess_db_puzzle.csv",
+    "audit": "npm audit --omit=dev"
   },
   "dependencies": {
-    "@lichess-org/chessground": "^10.2.0",
-    "chess.js": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "stockfish": "^19.0.0"
+    "@lichess-org/chessground": "10.2.0",
+    "chess.js": "1.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "stockfish": "19.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@vitejs/plugin-react": "latest",
-    "tailwindcss": "latest",
-    "tsx": "latest",
-    "typescript": "latest",
-    "vite": "latest"
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.6.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
   },
   "license": "GPL-3.0-or-later"
 }

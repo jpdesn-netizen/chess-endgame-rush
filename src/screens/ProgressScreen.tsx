@@ -2,7 +2,9 @@
 // sous-thème, points faibles (avec accès direct à l'entraînement ciblé).
 
 import { useMemo, useRef, useState } from 'react';
+import { AccountPanel } from '../components/AccountPanel';
 import { ScoreDashboard } from '../components/ScoreDashboard';
+import type { CloudAccount } from '../hooks/useCloudAccount';
 import { TypeProfile } from '../components/TypeProfile';
 import { ScoreChart } from '../components/charts/ScoreChart';
 import { FAMILY_LABEL } from '../core/material';
@@ -12,6 +14,7 @@ import type { PlayerStore } from '../services/playerStore';
 
 interface Props {
   store: PlayerStore;
+  account: CloudAccount;
   playerId: string | null;
   onPlayerChange: (id: string | null) => void;
   onTrain: (family: string, subcategory: string, mode?: 'storm' | 'streak') => void;
@@ -34,7 +37,7 @@ const FAMILIES: Family[] = ['pions', 'tours', 'dames', 'fous', 'cavaliers', 'mix
 const chip = (active: boolean) =>
   `rounded-full px-3 py-1 text-sm font-semibold transition ${active ? 'bg-amber-500 text-stone-900' : 'bg-stone-800 text-stone-200 hover:bg-stone-700'}`;
 
-export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHome }: Props) {
+export function ProgressScreen({ store, account, playerId, onPlayerChange, onTrain, onHome }: Props) {
   const [version, setVersion] = useState(0); // force la relecture après une modification
   const [newName, setNewName] = useState('');
   const [mode, setMode] = useState('');
@@ -44,8 +47,11 @@ export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHom
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const players = useMemo(() => store.listPlayers(), [store, version]);
-  const history = useMemo(() => (playerId ? store.history(playerId) : { attempts: [], runs: [] }), [store, playerId, version]);
+  const players = useMemo(() => store.listPlayers(), [store, version, playerId, account.lastSync]);
+  const history = useMemo(
+    () => (playerId ? store.history(playerId) : { attempts: [], runs: [] }),
+    [store, playerId, version, account.lastSync],
+  );
   const since = PERIODS.find((p) => p.id === period)!.ms;
   const filtered = useMemo(
     () => filterAttempts(history.attempts, { mode: mode || undefined, family: family || undefined, sinceMs: since ? Date.now() - since : undefined }),
@@ -165,9 +171,10 @@ export function ProgressScreen({ store, playerId, onPlayerChange, onTrain, onHom
         </div>
         {message && <p className="text-sm text-amber-300">{message}</p>}
         <p className="text-xs text-stone-500">
-          Les profils sont enregistrés dans ce navigateur, sur cet appareil. Pensez à exporter une sauvegarde ; les comptes en
-          ligne (tous appareils) viendront dans une étape suivante.
+          Les profils sont enregistrés dans ce navigateur. Connectez-vous à un compte en ligne pour les retrouver sur tous vos
+          appareils, ou exportez une sauvegarde.
         </p>
+        <AccountPanel account={account} playerId={playerId} playerName={current?.name ?? null} />
       </section>
 
       {!current ? (
