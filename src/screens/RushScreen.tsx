@@ -36,6 +36,15 @@ function formatTime(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/**
+ * Puzzle suivant préparé en avance : son éventuel échec (réseau coupé) est
+ * traité quand on l'attend, pas signalé comme erreur non gérée entre-temps.
+ */
+function preload<T>(promise: Promise<T>): Promise<T> {
+  promise.catch(() => undefined);
+  return promise;
+}
+
 export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, recentlySeen, onAttempt, onRunEnd, onRestart, onHome }: Props) {
   const [rush, setRush] = useState<RushState>(() => startRush(mode, startRating));
   const [current, setCurrent] = useState<Puzzle | null>(null);
@@ -84,7 +93,7 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, re
           return;
         }
         setCurrent(first);
-        nextPuzzle.current = findPlayable(startRating + eloStep(mode));
+        nextPuzzle.current = preload(findPlayable(startRating + eloStep(mode)));
       } catch (error) {
         if (!cancelled) setProblem(error instanceof Error ? error.message : String(error));
       }
@@ -161,7 +170,7 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, re
           return;
         }
         setCurrent(upcoming);
-        nextPuzzle.current = findPlayable(targetRating(next) + eloStep(mode));
+        nextPuzzle.current = preload(findPlayable(targetRating(next) + eloStep(mode)));
       } catch (error) {
         setProblem(error instanceof Error ? error.message : String(error));
         setRush((r) => ({ ...r, status: 'over' }));
