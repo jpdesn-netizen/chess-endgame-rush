@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { subcategoryOf } from './core/categories';
 import { CONFIG, rushRules, TRAINING_RULES } from './core/config';
 import { dueNow, reviewItems } from './core/review';
+import { ratingsByKey } from './core/playerRating';
 import { familyOf } from './core/material';
 import type { Puzzle } from './core/types';
 import { loadLichessPuzzles } from './data/lichessRepository';
@@ -134,6 +135,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [playerId, puzzlesById, screen],
   );
+  // Elo personnel du thème choisi (pour le départ « mon niveau »).
+  const myLevel = useMemo(() => {
+    if (!playerId) return null;
+    const ratings = ratingsByKey(playerStore.history(playerId).attempts);
+    const key = theme === 'mix' || theme === 'bases' ? 'all' : effSub !== 'all' ? `c:${effSub}` : `f:${theme}`;
+    const r = ratings.get(key);
+    return r && !r.provisional ? r.r : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerId, theme, effSub, screen]);
   const reviewDue = useMemo(() => (spaced ? dueNow(reviewAll, Date.now()) : reviewAll), [reviewAll, spaced]);
   const reviewed = useRef(new Set<string>()); // une seule tentative comptée par puzzle et par révision
   const startReview = useCallback((ids: string[]) => {
@@ -252,6 +262,7 @@ export default function App() {
         setSpaced(v);
       }}
       startRating={startRating}
+      myLevel={myLevel}
       poolSize={pool ? pool.length : null}
       loadError={loadError}
       best={mode === 'training' ? null : getBest(key)}

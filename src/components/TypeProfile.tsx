@@ -7,6 +7,7 @@ import { FAMILY_ORDER, filterAttempts, typeProfile, type AttemptLike, type TypeS
 import { FAMILY_LABEL } from '../core/material';
 import type { Family } from '../core/types';
 import { RadarChart, type RadarAxis } from './charts/RadarChart';
+import { formatRating, PROVISIONAL_RD, ratingsByKey, type RatedAttempt } from '../core/playerRating';
 
 const MIN_ATTEMPTS = 3; // en dessous, le type n'est pas placé sur le radar
 
@@ -45,10 +46,14 @@ export function TypeProfile({
     [attempts, mode, days],
   );
   const stats = useMemo(() => typeProfile(filtered, scope), [filtered, scope]);
+  // Elo personnel : sur TOUT l'historique (comme un classement Lichess), indépendamment des filtres.
+  const ratings = useMemo(() => ratingsByKey(attempts as RatedAttempt[]), [attempts]);
+  const ratingOf = (s: TypeStat) => ratings.get(scope === 'family' ? `f:${s.id}` : `c:${s.id}`);
+  const global = ratings.get('all');
   const enough = (s: TypeStat) => s.attempts >= MIN_ATTEMPTS;
 
-  // Échelle du niveau : bornée par les données, arrondie à 100 Elo.
-  const levels = stats.filter((s) => enough(s) && s.maxSolved !== null).map((s) => s.maxSolved!);
+  // Échelle de l'Elo personnel : bornée par les données, arrondie à 100.
+  const levels = stats.map(ratingOf).filter((r) => r && !r.provisional).map((r) => r!.r);
   const lo = levels.length ? Math.floor((Math.min(...levels) - 200) / 100) * 100 : 0;
   const hiRaw = levels.length ? Math.max(...levels) : lo + 400;
   // Étendue multiple de 400 : les 4 anneaux tombent sur des centaines rondes.
@@ -66,19 +71,24 @@ export function TypeProfile({
     display: s.attempts ? pct(s.rate) : '–',
     detail: detail(s),
   }));
-  const lvlAxes: RadarAxis[] = stats.map((s) => ({
-    id: s.id,
-    label: s.label,
-    value: enough(s) && s.maxSolved !== null ? (s.maxSolved - lo) / (hi - lo) : null,
-    display: elo(s.maxSolved),
-    detail: `${detail(s)}${s.avgFailed !== null ? ` · bute vers ${elo(s.avgFailed)}` : ''}`,
-  }));
+  const lvlAxes: RadarAxis[] = stats.map((s) => {
+    const r = ratingOf(s);
+    return {
+      id: s.id,
+      label: s.label,
+      value: r && !r.provisional ? (r.r - lo) / (hi - lo) : null,
+      display: formatRating(r),
+      detail: r
+        ? `${r.games} puzzle(s) notés · ±${r.rd}${r.provisional ? ` — provisoire (écart-type > ${PROVISIONAL_RD})` : ''}`
+        : 'Aucun puzzle noté',
+    };
+  });
   const ringsLvl = [0.25, 0.5, 0.75, 1].map((r) => ({ r, label: elo(Math.round(lo + r * (hi - lo))) }));
 
   const ranking = [...stats]
     .filter((s) => s.attempts > 0)
     .sort((a, b) =>
-      sort === 'rate' ? a.rate - b.rate || b.attempts - a.attempts : (a.maxSolved ?? 0) - (b.maxSolved ?? 0) || a.rate - b.rate,
+      sort === 'rate' ? a.rate - b.rate || b.attempts - a.attempts : (ratingOf(a)?.r ?? 0) - (ratingOf(b)?.r ?? 0) || a.rate - b.rate,
     );
 
   return (
@@ -111,8 +121,15 @@ export function TypeProfile({
           ))}
         </select>
       </div>
+      {global && (
+        <p className="text-sm text-stone-200">
+          🎯 Elo finales (tous thèmes) : <strong className="text-amber-300">{formatRating(global)}</strong>{' '}
+          <span className="text-stone-400">±{global.rd} · {global.games} puzzles notés</span>
+        </p>
+      )}
       <p className="text-xs text-stone-500">
-        Précision = puzzles réussis / tentés. Niveau atteint = Elo du puzzle le plus difficile réussi ; « bute vers » = Elo moyen
+        Elo perso : calculé comme sur Lichess (Glicko-2, départ 1500), sur tout l’historique, première tentative de chaque puzzle ;
+        « ? » = provisoire. Précision = puzzles réussis / tentés. « + difficile réussi » = Elo du puzzle le plus difficile réussi ; « bute vers » = Elo moyen
         des puzzles manqués. Un type joué moins de {MIN_ATTEMPTS} fois n’est pas placé sur le radar.
       </p>
 
@@ -126,7 +143,7 @@ export function TypeProfile({
               axes={accAxes}
               rings={[0.25, 0.5, 0.75, 1].map((r) => ({ r, label: pct(r) }))}
             />
-            <RadarChart title="Niveau atteint par type (Elo)" axes={lvlAxes} rings={ringsLvl} />
+            <RadarChart title="Elo personnel par type (Glicko-2)" axes={lvlAxes} rings={ringsLvl} />
           </div>
 
           <div className="overflow-x-auto">
@@ -143,9 +160,10 @@ export function TypeProfile({
                   </th>
                   <th className="py-1 pr-3 text-right font-semibold">
                     <button type="button" onClick={() => setSort('level')} className={sort === 'level' ? 'text-amber-400' : 'hover:text-stone-200'}>
-                      Niveau atteint {sort === 'level' && '▲'}
+                      Elo perso {sort === 'level' && '▲'}
                     </button>
                   </th>
+                  <th className="py-1 pr-3 text-right font-semibold">+ difficile réussi</th>
                   <th className="py-1 pr-3 text-right font-semibold">Bute vers</th>
                   <th className="py-1" />
                 </tr>
@@ -160,6 +178,9 @@ export function TypeProfile({
                     </td>
                     <td className="py-1 pr-3 text-right">{s.attempts}</td>
                     <td className="py-1 pr-3 text-right font-semibold">{pct(s.rate)}</td>
+                    <td className="py-1 pr-3 text-right font-semibold" title={ratingOf(s) ? `±${ratingOf(s)!.rd}` : undefined}>
+                      {formatRating(ratingOf(s))}
+                    </td>
                     <td className="py-1 pr-3 text-right">{elo(s.maxSolved)}</td>
                     <td className="py-1 pr-3 text-right text-stone-400">{elo(s.avgFailed)}</td>
                     <td className="py-1 text-right">

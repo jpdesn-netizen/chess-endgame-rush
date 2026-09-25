@@ -54,6 +54,8 @@ interface Props {
   onSpaced: (on: boolean) => void;
   onSub: (s: string) => void;
   startRating: number;
+  /** Elo personnel du joueur pour le thème choisi (s'il n'est plus provisoire). */
+  myLevel: number | null;
   poolSize: number | null;
   loadError: string | null;
   best: BestScore | null;
@@ -74,6 +76,9 @@ function Count({ n }: { n?: number }) {
 
 const chip = (active: boolean) =>
   `rounded-full px-3 py-1.5 text-sm font-semibold transition ${active ? 'bg-amber-500 text-stone-900' : 'bg-stone-800 text-stone-200 hover:bg-stone-700'}`;
+
+/** Départ légèrement sous l'Elo personnel (échauffement), arrondi à 50. */
+const myStart = (elo: number) => Math.max(400, Math.round((elo - 100) / 50) * 50);
 
 export function HomeScreen(p: Props) {
   const rush = p.mode !== 'training';
@@ -201,6 +206,16 @@ export function HomeScreen(p: Props) {
                   {l.label} ({l.rating})
                 </button>
               ))}
+              {p.myLevel !== null && (
+                <button
+                  type="button"
+                  className={chip(p.startRating === myStart(p.myLevel))}
+                  onClick={() => p.onStartRating(myStart(p.myLevel!))}
+                  title="Départ un peu sous votre Elo personnel pour ce thème"
+                >
+                  🎯 Mon niveau ({myStart(p.myLevel)})
+                </button>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
