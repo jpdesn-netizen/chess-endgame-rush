@@ -20,6 +20,7 @@ export function AccountPanel({ account, playerId, playerName }: { account: Cloud
   const [captcha, setCaptcha] = useState<string | undefined>();
   const [captchaReset, setCaptchaReset] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
   const onToken = useCallback((t: string | undefined) => setCaptcha(t), []);
   const a = account;
 
@@ -55,7 +56,9 @@ export function AccountPanel({ account, playerId, playerName }: { account: Cloud
           <label className="text-sm text-stone-300" htmlFor="newpw">
             Nouveau mot de passe (12 caractères min., majuscules, minuscules, chiffres)
           </label>
-          <input id="newpw" type="password" autoComplete="new-password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={12} maxLength={72} />
+          <PasswordBox show={showPw} onToggle={() => setShowPw((v) => !v)}>
+            <input id="newpw" type={showPw ? 'text' : 'password'} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="new-password" className={input} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={12} maxLength={72} />
+          </PasswordBox>
           <button type="submit" className={primary} disabled={a.busy}>
             Enregistrer
           </button>
@@ -215,10 +218,14 @@ export function AccountPanel({ account, playerId, playerName }: { account: Cloud
           tab === 'login' ? a.signIn(email, password, captcha) : tab === 'signup' ? a.signUp(email, password, captcha) : a.resetPassword(email, captcha),
         )}
       >
-        <input type="email" autoComplete="email" placeholder="Email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} />
+        <input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} />
         {tab !== 'reset' && (
+          <PasswordBox show={showPw} onToggle={() => setShowPw((v) => !v)}>
           <input
-            type="password"
+            type={showPw ? 'text' : 'password'}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
             placeholder={tab === 'signup' ? 'Mot de passe (12 caractères min.)' : 'Mot de passe'}
             className={input}
@@ -228,6 +235,7 @@ export function AccountPanel({ account, playerId, playerName }: { account: Cloud
             minLength={tab === 'signup' ? 12 : 1}
             maxLength={72}
           />
+          </PasswordBox>
         )}
         {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onToken={onToken} resetSignal={captchaReset} />}
         <button type="submit" className={primary} disabled={a.busy || needCaptcha}>
@@ -245,6 +253,24 @@ export function AccountPanel({ account, playerId, playerName }: { account: Cloud
       )}
       {msg}
     </Box>
+  );
+}
+
+/** Champ mot de passe avec bouton pour l'afficher (utile sur téléphone). */
+function PasswordBox({ show, onToggle, children }: { show: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <div className="relative">
+      {children}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute inset-y-0 right-2 px-2 text-sm text-stone-400 hover:text-stone-100"
+        aria-label={show ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+        title={show ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+      >
+        {show ? '🙈' : '👁'}
+      </button>
+    </div>
   );
 }
 
