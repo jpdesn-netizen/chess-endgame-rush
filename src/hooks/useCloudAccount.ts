@@ -2,7 +2,7 @@
 
 import type { Factor, Session } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authErrorMessage, cloud, passwordProblem } from '../services/cloud';
+import { authErrorMessage, cloud, markResetRequested, openedFromEmailLink, openedFromResetLink, passwordProblem, recoveryDetected } from '../services/cloud';
 import type { PlayerStore } from '../services/playerStore';
 import { flush, linkedUser, linkPlayer, pendingCount, playerOfUser, pull, unlinkPlayer } from '../services/sync';
 
@@ -46,7 +46,7 @@ export function useCloudAccount(
 ): CloudAccount {
   const [session, setSession] = useState<Session | null>(null);
   const [needMfa, setNeedMfa] = useState(false);
-  const [recovery, setRecovery] = useState(false);
+  const [recovery, setRecovery] = useState(openedFromResetLink);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<CloudAccount['message']>(null);
   const [pending, setPending] = useState(0);
@@ -73,7 +73,19 @@ export function useCloudAccount(
   // Session : lecture initiale + suivi des changements.
   useEffect(() => {
     if (!cloud) return;
-    void cloud.auth.getSession().then(({ data }) => setSession(data.session));
+    void cloud.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session && recoveryDetected()) setRecovery(true);
+      if (openedFromEmailLink && !data.session) {
+        setRecovery(false);
+        setMessage({
+          tone: 'error',
+          text: openedFromResetLink
+            ? 'Lien de réinitialisation expiré ou déjà utilisé : redemandez-en un (« Mot de passe oublié ? »).'
+            : 'Ce lien a été ouvert dans un autre navigateur que celui de la demande. S’il s’agissait de la confirmation de votre email, elle est faite : connectez-vous. Pour un mot de passe oublié, refaites la demande depuis ce navigateur-ci.',
+        });
+      }
+    });
     const { data } = cloud.auth.onAuthStateChange((event, s) => {
       // Pas d'appel Supabase ici (recommandation de la doc) : on met à jour l'état.
       setSession(s);
@@ -178,9 +190,10 @@ export function useCloudAccount(
 
     resetPassword: (email, captchaToken) =>
       run(async () => {
+        markResetRequested();
         const { error } = await cloud!.auth.resetPasswordForEmail(email, { redirectTo: appUrl(), captchaToken });
         if (error && error.status === 429) throw error;
-        ok('Si un compte existe pour cette adresse, un email de réinitialisation vient d’être envoyé.');
+        ok('Si un compte existe pour cette adresse, un email de réinitialisation vient d’être envoyé. Ouvrez le lien dans CE navigateur.');
       }),
 
     setNewPassword: (password) =>
@@ -190,6 +203,7 @@ export function useCloudAccount(
         const { error } = await cloud!.auth.updateUser({ password });
         if (error) throw error;
         setRecovery(false);
+        markResetRequested(true);
         linkedFor.current = null;
         ok('Mot de passe modifié.');
       }),

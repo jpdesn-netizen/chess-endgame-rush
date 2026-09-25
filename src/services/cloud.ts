@@ -14,12 +14,44 @@ if (key && /^sb_secret_|service_role/.test(key)) {
   throw new Error('Clé Supabase SECRÈTE détectée dans la configuration du site : utilisez la clé « publishable ».');
 }
 
+// --- Retour depuis un lien reçu par email -------------------------------
+// Lu AVANT la création du client : la bibliothèque retire ensuite le code de l'URL.
+const RESET_KEY = 'endgameRush:v1:resetRequestedAt';
+const readResetAt = () => {
+  try {
+    return Number(window.localStorage.getItem(RESET_KEY) ?? 0);
+  } catch {
+    return 0;
+  }
+};
+/** La page a été ouverte depuis un lien d'email (confirmation ou mot de passe oublié). */
+export const openedFromEmailLink = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('code');
+/** … et ce navigateur avait demandé une réinitialisation il y a moins de 2 h : c'est un retour « mot de passe oublié ». */
+export const openedFromResetLink = openedFromEmailLink && Date.now() - readResetAt() < 2 * 3_600_000;
+
+export function markResetRequested(done = false): void {
+  try {
+    if (done) window.localStorage.removeItem(RESET_KEY);
+    else window.localStorage.setItem(RESET_KEY, String(Date.now()));
+  } catch {
+    /* stockage indisponible : on se fie à l'évènement de la bibliothèque */
+  }
+}
+
 export const cloud: SupabaseClient | null =
   url && key && /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)
     ? createClient(url, key, {
         auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       })
     : null;
+
+// Évènement « retour de réinitialisation » capté dès le chargement (avant que
+// l'interface ne s'abonne, sinon il serait perdu).
+let recoveryEvent = false;
+cloud?.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') recoveryEvent = true;
+});
+export const recoveryDetected = () => recoveryEvent || openedFromResetLink;
 
 export const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITEKEY || null;
 
@@ -38,7 +70,9 @@ export function authErrorMessage(error: unknown): string {
   // Envoi d'email refusé par le serveur (ex. service d'email pas encore configuré).
   if (code === 'email_address_not_authorized' || code === 'email_provider_disabled' || code === 'signup_disabled' || (e?.status ?? 0) >= 500)
     return 'Création de compte ou envoi d’email impossible pour le moment. Réessayez plus tard.';
-  return 'Identifiants incorrects, ou compte pas encore confirmé par email.';
+  const generic = 'Identifiants incorrects, ou compte pas encore confirmé par email.';
+  // Le code technique (sans information sur le compte) aide au diagnostic.
+  return code && code !== 'invalid_credentials' ? `${generic} (code : ${code})` : generic;
 }
 
 /** Règle locale (la même doit être réglée dans Supabase → Auth → Password). */

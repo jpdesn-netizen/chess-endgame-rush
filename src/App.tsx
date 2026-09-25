@@ -13,6 +13,7 @@ import { RushScreen } from './screens/RushScreen';
 import { getBest, scoreKey } from './services/highScores';
 import { judge } from './services/judge';
 import { useCloudAccount } from './hooks/useCloudAccount';
+import { openedFromEmailLink } from './services/cloud';
 import type { Run } from './services/playerStore';
 import { playerStore } from './services/players';
 
@@ -110,8 +111,8 @@ export default function App() {
   const account = useCloudAccount(playerStore, playerId, changePlayer);
   // Arrivée par le lien « mot de passe oublié » : ouvrir l'écran du compte.
   useEffect(() => {
-    if (account.recovery) setScreen({ name: 'progress' });
-  }, [account.recovery]);
+    if (account.recovery || (account.message?.tone === 'error' && openedFromEmailLink)) setScreen({ name: 'progress' });
+  }, [account.recovery, account.message]);
 
   // Puzzles des parties récentes du joueur (évités tant qu'il reste du choix).
   const recentlySeen = useMemo(
