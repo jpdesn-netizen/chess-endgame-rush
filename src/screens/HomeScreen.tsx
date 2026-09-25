@@ -1,5 +1,6 @@
 import { SUBCATEGORIES } from '../core/categories';
 import { CONFIG } from '../core/config';
+import { InstallButton } from '../components/InstallButton';
 import { SOURCE_URL } from './PrivacyScreen';
 import { sideToMove } from '../core/fen';
 import { materialSignature } from '../core/material';
@@ -98,7 +99,8 @@ export function HomeScreen(p: Props) {
           <h1 className={`font-extrabold text-stone-50 ${p.compact ? 'text-2xl' : 'text-3xl sm:text-4xl'}`}>♔ Chess Endgame Rush</h1>
           {!p.compact && <p className="mt-2 text-stone-400">Finales de parties réelles, jugées coup par coup (table de finales et Stockfish).</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+        {!p.compact && <InstallButton />}
         <button
           type="button"
           onClick={p.onProgress}
