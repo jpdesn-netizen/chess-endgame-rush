@@ -58,7 +58,8 @@ export default function App() {
   const [mode, setMode] = useState<HomeMode>(embed.mode ?? 'storm');
   const [theme, setTheme] = useState<ThemeChoice>((embed.theme as ThemeChoice) ?? 'mix');
   const [sub, setSub] = useState<string>(embed.sub ?? 'all');
-  const [startRating, setStartRating] = useState<number>(embed.level ?? CONFIG.startLevels[0].rating);
+  // Niveau de départ facultatif : null = automatique (exercices les plus faciles du thème, puis ça monte).
+  const [startRating, setStartRating] = useState<number | null>(embed.level ?? null);
   const [lichess, setLichess] = useState<Puzzle[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(() => playerStore.currentPlayerId());
@@ -82,7 +83,14 @@ export default function App() {
   const effSub = sub === 'all' || !lichess || (counts.get(sub) ?? 0) >= CONFIG.minPuzzlesPerTheme ? sub : 'all';
   const pool = useMemo(() => (lichess ? buildPool(theme, effSub, lichess) : null), [theme, effSub, lichess]);
   const themeKey = effSub === 'all' ? theme : `${theme}/${effSub}`;
-  const key = mode === 'training' ? '' : scoreKey(mode, `${playerId ?? 'invite'}|${themeKey}`, startRating);
+  const autoStart = useMemo(() => {
+    if (!pool?.length) return CONFIG.startLevels[0].rating;
+    const min = pool.reduce((m, p) => Math.min(m, p.rating), Infinity);
+    return Math.max(400, Math.floor(min / 50) * 50);
+  }, [pool]);
+  const effectiveStart = startRating ?? autoStart;
+  // Records : « automatique » a sa propre catégorie (clé 0).
+  const key = mode === 'training' ? '' : scoreKey(mode, `${playerId ?? 'invite'}|${themeKey}`, startRating ?? 0);
   const shell = (content: ReactNode) => <main className="min-h-dvh bg-stone-900 text-stone-100">{content}</main>;
 
   const changePlayer = useCallback((id: string | null) => {
@@ -319,7 +327,7 @@ export default function App() {
         mode={mode}
         pool={pool}
         theme={themeKey}
-        startRating={startRating}
+        startRating={effectiveStart}
         scoreKey={key}
         judge={judge}
         recentlySeen={recentlySeen}

@@ -54,7 +54,8 @@ interface Props {
   onReview: () => void;
   onSpaced: (on: boolean) => void;
   onSub: (s: string) => void;
-  startRating: number;
+  /** null = automatique (du plus facile, la difficulté monte en jeu). */
+  startRating: number | null;
   /** Elo personnel du joueur pour le thème choisi (s'il n'est plus provisoire). */
   myLevel: number | null;
   poolSize: number | null;
@@ -63,7 +64,7 @@ interface Props {
   basics: Puzzle[];
   onMode: (m: HomeMode) => void;
   onTheme: (t: ThemeChoice) => void;
-  onStartRating: (r: number) => void;
+  onStartRating: (r: number | null) => void;
   onStart: () => void;
   onTrain: (index: number) => void;
   /** Mode technique : nombre de positions ≤ 7 pièces pour le thème, et lancement. */
@@ -234,10 +235,23 @@ export function HomeScreen(p: Props) {
             )}
           </div>
           <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-400">Niveau de départ</h2>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-400">Niveau de départ <span className="font-normal normal-case text-stone-500">(facultatif)</span></h2>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={chip(p.startRating === null)}
+                onClick={() => p.onStartRating(null)}
+                title="Départ avec les exercices les plus faciles du thème ; la difficulté monte à chaque réussite"
+              >
+                ⬆️ Automatique
+              </button>
               {CONFIG.startLevels.map((l) => (
-                <button key={l.id} type="button" className={chip(p.startRating === l.rating)} onClick={() => p.onStartRating(l.rating)}>
+                <button
+                  key={l.id}
+                  type="button"
+                  className={chip(p.startRating === l.rating)}
+                  onClick={() => p.onStartRating(p.startRating === l.rating ? null : l.rating)}
+                >
                   {l.label} ({l.rating})
                 </button>
               ))}
@@ -245,7 +259,7 @@ export function HomeScreen(p: Props) {
                 <button
                   type="button"
                   className={chip(p.startRating === myStart(p.myLevel))}
-                  onClick={() => p.onStartRating(myStart(p.myLevel!))}
+                  onClick={() => p.onStartRating(p.startRating === myStart(p.myLevel!) ? null : myStart(p.myLevel!))}
                   title="Départ un peu sous votre Elo personnel pour ce thème"
                 >
                   🎯 Mon niveau ({myStart(p.myLevel)})
