@@ -30,6 +30,7 @@ export function buildHeaders(env) {
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",
+    "manifest-src 'self'",
     'upgrade-insecure-requests',
   ].join('; ');
 
@@ -49,6 +50,13 @@ export function buildHeaders(env) {
     '',
     '/assets/*',
     '  Cache-Control: public, max-age=31536000, immutable',
+    '',
+    // Le service worker et le manifeste doivent toujours être relus (mises à jour).
+    '/sw.js',
+    '  Cache-Control: no-cache',
+    '',
+    '/manifest.webmanifest',
+    '  Cache-Control: no-cache',
     '',
   ].join('\n');
 }

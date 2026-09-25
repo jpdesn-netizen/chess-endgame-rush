@@ -2,6 +2,8 @@
 
 html,
 body {
+  /* Pas de zoom par double appui ni de délai de 300 ms sur mobile. */
+  touch-action: manipulation;
   background-color: #1c1917;
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -15,4 +17,13 @@ body {
 }
 .cg-wrap coords {
   font-weight: 700;
+}
+
+/* Échiquier : pas de défilement de la page pendant qu'on déplace une pièce. */
+.cg-wrap {
+  touch-action: none;
+}
+/* Encoches des téléphones (mode installé). */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
