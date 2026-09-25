@@ -4,6 +4,7 @@ import { CONFIG, rushRules, TECHNIQUE_RULES, TRAINING_RULES } from './core/confi
 import { countPieces } from './core/fen';
 import { dueNow, reviewItems } from './core/review';
 import { ratingsByKey } from './core/playerRating';
+import { dailyPick, dayKey, dayStreak } from './core/motivation';
 import { familyOf } from './core/material';
 import type { Puzzle } from './core/types';
 import { loadLichessPuzzles } from './data/lichessRepository';
@@ -22,7 +23,7 @@ import type { Run } from './services/playerStore';
 import { playerStore } from './services/players';
 import { getSettings, setSetting } from './services/settings';
 
-type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number } | { name: 'technique'; id: string; n: number };
+type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number } | { name: 'technique'; id: string; n: number } | { name: 'daily' };
 
 const embed = readEmbedOptions();
 
@@ -90,7 +91,7 @@ export default function App() {
   }, []);
 
   const onAttempt = useCallback(
-    (puzzle: Puzzle, success: boolean, m: 'storm' | 'streak' | 'training' | 'review') => {
+    (puzzle: Puzzle, success: boolean, m: 'storm' | 'streak' | 'training' | 'review' | 'daily') => {
       if (!playerId) return;
       playerStore.addAttempt(playerId, {
         t: Date.now(),
@@ -136,6 +137,28 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [playerId, puzzlesById, screen],
   );
+  // --- Motivation : série de jours et puzzle du jour ----------------------------
+  const motivation = useMemo(() => {
+    const now = Date.now();
+    const daily = dailyPick(lichess ?? [], now);
+    if (!playerId) return { streak: null, daily, dailyResult: null as boolean | null };
+    const acts = playerStore.history(playerId).attempts;
+    const today = dayKey(now);
+    const dailyTry = daily ? acts.find((a) => a.m === 'daily' && a.p === daily.id && dayKey(a.t) === today) : undefined;
+    return { streak: dayStreak(acts, now), daily, dailyResult: dailyTry ? dailyTry.ok : null };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerId, lichess, screen]);
+  const dailyRecorded = useRef(false);
+  const onDailyAttempt = useCallback(
+    (p: Puzzle, ok: boolean) => {
+      // Seule la première tentative du jour compte.
+      if (dailyRecorded.current || motivation.dailyResult !== null) return;
+      dailyRecorded.current = true;
+      onAttempt(p, ok, 'daily');
+    },
+    [onAttempt, motivation.dailyResult],
+  );
+
   // --- Mode technique : positions ≤ 7 pièces jouées jusqu'au bout ------------
   const techniquePool = useMemo(
     () =>
@@ -237,6 +260,24 @@ export default function App() {
     );
   }
 
+  if (screen.name === 'daily' && motivation.daily) {
+    const d = motivation.daily;
+    return shell(
+      <GameScreen
+        key={`daily-${d.id}`}
+        puzzle={d}
+        position={{ index: 0, total: 1 }}
+        judge={judge}
+        rules={rushRules(d.solution)}
+        backLabel="← Accueil"
+        header={`📌 Puzzle du jour — ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · le même pour tous`}
+        onAttempt={onDailyAttempt}
+        onHome={() => setScreen({ name: 'home' })}
+        onNext={() => setScreen({ name: 'home' })}
+      />,
+    );
+  }
+
   if (screen.name === 'technique') {
     const puzzle = puzzlesById.get(screen.id);
     if (puzzle) {
@@ -310,6 +351,12 @@ export default function App() {
       startRating={startRating}
       myLevel={myLevel}
       techniqueCount={lichess ? techniquePool.length : null}
+      streak={motivation.streak}
+      daily={motivation.daily ? { rating: motivation.daily.rating, title: motivation.daily.title, result: motivation.dailyResult } : null}
+      onDaily={() => {
+        dailyRecorded.current = false;
+        setScreen({ name: 'daily' });
+      }}
       onTechnique={() => nextTechnique(0)}
       poolSize={pool ? pool.length : null}
       loadError={loadError}

@@ -4,6 +4,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { AccountPanel } from '../components/AccountPanel';
 import { ScoreDashboard } from '../components/ScoreDashboard';
+import { badges, dayStreak } from '../core/motivation';
+import { ratingsByKey } from '../core/playerRating';
 import type { CloudAccount } from '../hooks/useCloudAccount';
 import { TypeProfile } from '../components/TypeProfile';
 import { ScoreChart } from '../components/charts/ScoreChart';
@@ -209,6 +211,9 @@ export function ProgressScreen({ store, account, onPrivacy, playerId, onPlayerCh
             }}
           />
 
+          {/* Badges */}
+          <BadgeGrid history={history} />
+
           {/* Points faibles par type de finale : radars + classement */}
           <TypeProfile attempts={history.attempts} onTrain={(f, s) => onTrain(f, s)} />
 
@@ -269,5 +274,33 @@ function Stat({ value, label }: { value: string; label: string }) {
       <div className="text-3xl font-black text-stone-50 tabular-nums">{value}</div>
       <div className="text-[11px] uppercase tracking-wide text-stone-400">{label}</div>
     </div>
+  );
+}
+
+function BadgeGrid({ history }: { history: { attempts: { t: number; m: string; p: string; r: number; c: string; f: string; ok: boolean }[]; runs: { mode: string; score: number }[] } }) {
+  const list = useMemo(
+    () => badges(history.attempts, history.runs, dayStreak(history.attempts, Date.now()), ratingsByKey(history.attempts).get('all')),
+    [history],
+  );
+  const earned = list.filter((b) => b.earned).length;
+  return (
+    <section className="flex flex-col gap-3 rounded-xl bg-stone-800/60 p-4">
+      <h2 className="text-lg font-bold text-stone-50">
+        🏅 Badges <span className="text-sm font-normal text-stone-400">({earned}/{list.length})</span>
+      </h2>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {list.map((b) => (
+          <li
+            key={b.id}
+            title={b.desc}
+            className={`flex flex-col items-center rounded-lg p-2 text-center ${b.earned ? 'bg-amber-500/15 ring-1 ring-amber-500/40' : 'bg-stone-900/60 opacity-60'}`}
+          >
+            <span className={`text-2xl ${b.earned ? '' : 'grayscale'}`}>{b.icon}</span>
+            <span className="text-xs font-semibold text-stone-100">{b.label}</span>
+            <span className="text-[11px] text-stone-400">{b.earned ? 'Obtenu' : b.progress}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

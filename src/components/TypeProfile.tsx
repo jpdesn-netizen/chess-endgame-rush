@@ -19,6 +19,7 @@ const MODES = [
   { id: 'streak', label: 'Streak' },
   { id: 'training', label: 'Entraînement' },
   { id: 'review', label: 'Révision' },
+  { id: 'daily', label: 'Puzzle du jour' },
   { id: '', label: 'Tous modes' },
 ];
 const PERIODS = [

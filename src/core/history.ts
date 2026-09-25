@@ -3,7 +3,7 @@
 
 export interface Attempt {
   t: number; // horodatage (ms)
-  m: 'storm' | 'streak' | 'training' | 'review';
+  m: 'storm' | 'streak' | 'training' | 'review' | 'daily';
   p: string; // identifiant du puzzle
   r: number; // Elo du puzzle
   c: string; // sous-catégorie
@@ -53,7 +53,7 @@ export function isAttempt(a: unknown): a is Attempt {
     !!x &&
     typeof x === 'object' &&
     int(x.t, T_MIN, T_MAX) &&
-    (x.m === 'storm' || x.m === 'streak' || x.m === 'training' || x.m === 'review') &&
+    (x.m === 'storm' || x.m === 'streak' || x.m === 'training' || x.m === 'review' || x.m === 'daily') &&
     str(x.p, 40, ID) &&
     int(x.r, 0, 4000) &&
     str(x.c, 40, ID) &&

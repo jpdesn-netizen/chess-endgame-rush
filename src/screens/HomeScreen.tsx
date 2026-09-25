@@ -67,6 +67,11 @@ interface Props {
   onTrain: (index: number) => void;
   /** Mode technique : nombre de positions ≤ 7 pièces pour le thème, et lancement. */
   techniqueCount: number | null;
+  /** Série de jours d'entraînement (joueur sélectionné). */
+  streak: { current: number; best: number; playedToday: boolean } | null;
+  /** Puzzle du jour : résultat du joueur aujourd'hui (null = pas encore joué). */
+  daily: { rating: number; title: string; result: boolean | null } | null;
+  onDaily: () => void;
   onTechnique: () => void;
 }
 
@@ -116,6 +121,31 @@ export function HomeScreen(p: Props) {
         </button>
         </div>
       </header>
+
+      {!p.compact && (p.daily || p.streak) && (
+        <section className="mb-4 flex flex-wrap items-center gap-3">
+          {p.streak && (
+            <span
+              className={`rounded-full px-3 py-1.5 text-sm font-bold ${p.streak.current > 0 ? 'bg-orange-500/20 text-orange-300' : 'bg-stone-800 text-stone-400'}`}
+              title={`Meilleure série : ${p.streak.best} jour(s)`}
+            >
+              🔥 {p.streak.current} jour{p.streak.current > 1 ? 's' : ''} d’affilée
+              {!p.streak.playedToday && p.streak.current > 0 && ' · joue aujourd’hui pour la prolonger'}
+            </span>
+          )}
+          {p.daily && (
+            <button
+              type="button"
+              onClick={p.onDaily}
+              className="rounded-full bg-stone-800 px-3 py-1.5 text-sm font-semibold text-stone-100 hover:bg-stone-700"
+              title={p.daily.title}
+            >
+              📌 Puzzle du jour (Elo {p.daily.rating}){' '}
+              {p.daily.result === null ? '→ à jouer' : p.daily.result ? '✅ réussi' : '❌ raté (à revoir)'}
+            </button>
+          )}
+        </section>
+      )}
 
       {p.review && p.review.total > 0 && (
         <section className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
