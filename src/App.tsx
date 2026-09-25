@@ -8,6 +8,7 @@ import { PUZZLES_MOCK } from './data/puzzlesMock';
 import { readEmbedOptions } from './embed';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen, type HomeMode, type ThemeChoice } from './screens/HomeScreen';
+import { PrivacyScreen } from './screens/PrivacyScreen';
 import { ProgressScreen } from './screens/ProgressScreen';
 import { RushScreen } from './screens/RushScreen';
 import { getBest, scoreKey } from './services/highScores';
@@ -17,7 +18,7 @@ import { openedFromEmailLink } from './services/cloud';
 import type { Run } from './services/playerStore';
 import { playerStore } from './services/players';
 
-type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' };
+type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' };
 
 const embed = readEmbedOptions();
 
@@ -124,11 +125,16 @@ export default function App() {
 
   const playerName = playerStore.listPlayers().find((p) => p.id === playerId)?.name ?? null;
 
+  if (screen.name === 'privacy') {
+    return shell(<PrivacyScreen onHome={() => setScreen({ name: 'home' })} />);
+  }
+
   if (screen.name === 'progress') {
     return shell(
       <ProgressScreen
         store={playerStore}
         account={account}
+        onPrivacy={() => setScreen({ name: 'privacy' })}
         playerId={playerId}
         onPlayerChange={changePlayer}
         onHome={() => setScreen({ name: 'home' })}
@@ -184,6 +190,7 @@ export default function App() {
       counts={counts}
       playerName={playerName}
       onProgress={() => setScreen({ name: 'progress' })}
+      onPrivacy={() => setScreen({ name: 'privacy' })}
       startRating={startRating}
       poolSize={pool ? pool.length : null}
       loadError={loadError}

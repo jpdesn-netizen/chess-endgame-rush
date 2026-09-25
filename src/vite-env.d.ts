@@ -9,6 +9,10 @@ interface ImportMetaEnv {
   readonly VITE_TURNSTILE_SITEKEY?: string;
   /** Origines autorisées à intégrer l'appli et à recevoir les scores (séparées par des virgules). */
   readonly VITE_PARENT_ORIGINS?: string;
+  /** Adresse de contact affichée sur la page « Données personnelles » (facultatif). */
+  readonly VITE_CONTACT_EMAIL?: string;
+  /** Lien vers le code source public (licence GPL). */
+  readonly VITE_SOURCE_URL?: string;
 }
 
 interface ImportMeta {

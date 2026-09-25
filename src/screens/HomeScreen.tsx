@@ -1,5 +1,6 @@
 import { SUBCATEGORIES } from '../core/categories';
 import { CONFIG } from '../core/config';
+import { SOURCE_URL } from './PrivacyScreen';
 import { sideToMove } from '../core/fen';
 import { materialSignature } from '../core/material';
 import type { RushMode } from '../core/rush/rushRules';
@@ -46,6 +47,7 @@ interface Props {
   counts: Map<string, number>;
   playerName: string | null;
   onProgress: () => void;
+  onPrivacy: () => void;
   onSub: (s: string) => void;
   startRating: number;
   poolSize: number | null;
@@ -209,7 +211,17 @@ export function HomeScreen(p: Props) {
       {!p.compact && (
         <footer className="mt-10 text-xs text-stone-500">
           Positions de parties réelles : base de puzzles Lichess (licence CC0). Jugement : table de finales Syzygy (API Lichess)
-          et Stockfish. Échiquier : chessground (Lichess). Logiciel sous licence GPL v3.
+          et Stockfish. Échiquier : chessground (Lichess). Logiciel libre sous licence GPL v3.
+          <div className="mt-2 flex flex-wrap gap-4">
+            <button type="button" onClick={p.onPrivacy} className="text-sky-400 hover:underline">
+              🔒 Données personnelles
+            </button>
+            {SOURCE_URL && (
+              <a href={SOURCE_URL} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">
+                Code source (GPL v3)
+              </a>
+            )}
+          </div>
         </footer>
       )}
     </div>

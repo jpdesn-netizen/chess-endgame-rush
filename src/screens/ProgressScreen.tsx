@@ -15,6 +15,7 @@ import type { PlayerStore } from '../services/playerStore';
 interface Props {
   store: PlayerStore;
   account: CloudAccount;
+  onPrivacy: () => void;
   playerId: string | null;
   onPlayerChange: (id: string | null) => void;
   onTrain: (family: string, subcategory: string, mode?: 'storm' | 'streak') => void;
@@ -37,7 +38,7 @@ const FAMILIES: Family[] = ['pions', 'tours', 'dames', 'fous', 'cavaliers', 'mix
 const chip = (active: boolean) =>
   `rounded-full px-3 py-1 text-sm font-semibold transition ${active ? 'bg-amber-500 text-stone-900' : 'bg-stone-800 text-stone-200 hover:bg-stone-700'}`;
 
-export function ProgressScreen({ store, account, playerId, onPlayerChange, onTrain, onHome }: Props) {
+export function ProgressScreen({ store, account, onPrivacy, playerId, onPlayerChange, onTrain, onHome }: Props) {
   const [version, setVersion] = useState(0); // force la relecture après une modification
   const [newName, setNewName] = useState('');
   const [mode, setMode] = useState('');
@@ -190,6 +191,9 @@ export function ProgressScreen({ store, account, playerId, onPlayerChange, onTra
           appareils, ou exportez une sauvegarde.
         </p>
         <AccountPanel account={account} playerId={playerId} playerName={current?.name ?? null} />
+        <button type="button" onClick={onPrivacy} className="self-start text-xs text-sky-400 hover:underline">
+          🔒 Données personnelles : ce qui est conservé et comment le supprimer
+        </button>
       </section>
 
       {!current ? (
