@@ -52,7 +52,7 @@ export function usePuzzlePlayer(puzzle: Puzzle, rules: ModeRules, judge: MoveJud
       const myToken = token.current;
       const started = performance.now();
       const previousUci = current.moves.map((m) => m.uci);
-      const ctx = { objective: puzzle.objective, previousUci, solution: puzzle.solution };
+      const ctx = { objective: puzzle.objective, previousUci, solution: puzzle.solution, vary: rules.varyDefense };
       // Le reducer étant pur, on calcule localement les états suivants pour
       // décider de la suite sans attendre le prochain rendu React.
       const afterPlayer = sessionReducer(current, { type: 'PLAYER_MOVED', move: applied });

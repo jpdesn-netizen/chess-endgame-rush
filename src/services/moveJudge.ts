@@ -8,7 +8,7 @@ import { countPieces } from '../core/fen';
 import { judgeByEngine, toCp } from '../core/judge/engineJudge';
 import { applyLineTolerance, isOnLine, preferLineReply } from '../core/judge/lineRules';
 import { outcomeOf } from '../core/judge/outcome';
-import { chooseDefense } from '../core/judge/opponent';
+import { chooseDefense, chooseVariedDefense } from '../core/judge/opponent';
 import { judgeMove, type Verdict } from '../core/judge/tablebaseJudge';
 import type { Objective } from '../core/types';
 import type { Engine } from './stockfish';
@@ -20,6 +20,8 @@ export interface JudgeContext {
   previousUci: string[];
   /** Ligne de la partie réelle (UCI), si connue. */
   solution?: string[];
+  /** Entraînement : défense variée (parmi les coups de même valeur), sans rejouer la partie réelle. */
+  vary?: boolean;
 }
 
 export type JudgeSource = 'tablebase' | 'engine';
@@ -100,11 +102,12 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
         return withFallback(
           async () => {
             const position = await tablebase.lookup(fen);
+            if (ctx.vary) return chooseVariedDefense(position)?.uci ?? null;
             const best = chooseDefense(position);
             if (!best) return null;
             return preferLineReply(position, best, ctx.previousUci, ctx.solution).uci;
           },
-          async () => (expected && applyUci(fen, expected) ? expected : (await engine.analyse(fen, movetime)).bestmove),
+          async () => (!ctx.vary && expected && applyUci(fen, expected) ? expected : (await engine.analyse(fen, movetime)).bestmove),
         );
       }
       // Plus de 7 pièces : on rejoue la partie réelle tant qu'on la suit,

@@ -71,18 +71,21 @@ export type ModeRules = {
   drawHoldMoves: number;
   /** Limite absolue de coups du joueur. */
   hardCapMoves: number;
+  /** Adversaire varié : défense tirée parmi les coups de même valeur (entraînement). */
+  varyDefense?: boolean;
 };
 
 /**
  * Mode technique : une position de partie réelle (≤ 7 pièces) jouée jusqu'au
  * bout contre la table de finales : mat, ou nulle tenue 20 coups.
  */
-export const TECHNIQUE_RULES: ModeRules = { maxPlayerMoves: null, hardCapMoves: 60, drawHoldMoves: 20 };
+export const TECHNIQUE_RULES: ModeRules = { maxPlayerMoves: null, hardCapMoves: 60, drawHoldMoves: 20, varyDefense: true };
 
 export const TRAINING_RULES: ModeRules = {
   maxPlayerMoves: CONFIG.modes.training.maxPlayerMoves,
   drawHoldMoves: CONFIG.modes.training.drawHoldMoves,
   hardCapMoves: CONFIG.modes.training.hardCapMoves,
+  varyDefense: true,
 };
 
 /**
