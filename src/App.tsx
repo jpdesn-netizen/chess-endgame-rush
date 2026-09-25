@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { subcategoryOf } from './core/categories';
-import { CONFIG, rushRules, TRAINING_RULES } from './core/config';
+import { CONFIG, rushRules, TECHNIQUE_RULES, TRAINING_RULES } from './core/config';
+import { countPieces } from './core/fen';
 import { dueNow, reviewItems } from './core/review';
 import { ratingsByKey } from './core/playerRating';
 import { familyOf } from './core/material';
@@ -21,7 +22,7 @@ import type { Run } from './services/playerStore';
 import { playerStore } from './services/players';
 import { getSettings, setSetting } from './services/settings';
 
-type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number };
+type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number } | { name: 'technique'; id: string; n: number };
 
 const embed = readEmbedOptions();
 
@@ -135,6 +136,30 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [playerId, puzzlesById, screen],
   );
+  // --- Mode technique : positions ≤ 7 pièces jouées jusqu'au bout ------------
+  const techniquePool = useMemo(
+    () =>
+      (lichess ?? []).filter(
+        (p) => countPieces(p.fen) <= CONFIG.tablebase.maxPieces && (theme === 'mix' || theme === 'bases' || p.family === theme),
+      ),
+    [lichess, theme],
+  );
+  const techniqueSeen = useRef(new Set<string>());
+  const nextTechnique = useCallback(
+    (n: number) => {
+      let choices = techniquePool.filter((p) => !techniqueSeen.current.has(p.id));
+      if (!choices.length) {
+        techniqueSeen.current = new Set();
+        choices = techniquePool;
+      }
+      const pick = choices[Math.floor(Math.random() * choices.length)];
+      if (!pick) return;
+      techniqueSeen.current.add(pick.id);
+      setScreen({ name: 'technique', id: pick.id, n });
+    },
+    [techniquePool],
+  );
+
   // Elo personnel du thème choisi (pour le départ « mon niveau »).
   const myLevel = useMemo(() => {
     if (!playerId) return null;
@@ -145,6 +170,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerId, theme, effSub, screen]);
   const reviewDue = useMemo(() => (spaced ? dueNow(reviewAll, Date.now()) : reviewAll), [reviewAll, spaced]);
+  const reviewFull = useMemo(() => new Set(reviewAll.filter((i) => i.full).map((i) => i.id)), [reviewAll]);
   const reviewed = useRef(new Set<string>()); // une seule tentative comptée par puzzle et par révision
   const startReview = useCallback((ids: string[]) => {
     reviewed.current = new Set();
@@ -201,7 +227,7 @@ export default function App() {
         puzzle={puzzle}
         position={{ index: screen.index, total: screen.ids.length }}
         judge={judge}
-        rules={puzzle.solution ? rushRules(puzzle.solution) : TRAINING_RULES}
+        rules={reviewFull.has(id) ? (puzzle.collection === 'bases' ? TRAINING_RULES : TECHNIQUE_RULES) : puzzle.solution ? rushRules(puzzle.solution) : TRAINING_RULES}
         backLabel="← Arrêter la révision"
         header={`🔁 Révision des erreurs · ${screen.index + 1}/${screen.ids.length} — sans chrono, la flèche montre le bon coup en cas d'erreur`}
         onAttempt={onReviewAttempt}
@@ -209,6 +235,26 @@ export default function App() {
         onNext={next}
       />,
     );
+  }
+
+  if (screen.name === 'technique') {
+    const puzzle = puzzlesById.get(screen.id);
+    if (puzzle) {
+      return shell(
+        <GameScreen
+          key={`${puzzle.id}-${screen.n}`}
+          puzzle={puzzle}
+          position={{ index: screen.n, total: techniquePool.length }}
+          judge={judge}
+          rules={TECHNIQUE_RULES}
+          backLabel="← Accueil"
+          header="🛠️ Technique — jouer jusqu’au bout contre la table de finales : mat, ou nulle tenue 20 coups"
+          onAttempt={onTrainingAttempt}
+          onHome={() => setScreen({ name: 'home' })}
+          onNext={() => nextTechnique(screen.n + 1)}
+        />,
+      );
+    }
   }
 
   if (screen.name === 'training') {
@@ -263,6 +309,8 @@ export default function App() {
       }}
       startRating={startRating}
       myLevel={myLevel}
+      techniqueCount={lichess ? techniquePool.length : null}
+      onTechnique={() => nextTechnique(0)}
       poolSize={pool ? pool.length : null}
       loadError={loadError}
       best={mode === 'training' ? null : getBest(key)}

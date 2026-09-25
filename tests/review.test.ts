@@ -27,3 +27,9 @@ test('à revoir maintenant, du plus urgent au moins urgent', () => {
   assert.deepEqual(items.map((i) => i.id), ['a', 'c', 'b']);
   assert.deepEqual(dueNow(items, T0 + 3.5 * D).map((i) => i.id), ['a', 'c']);
 });
+
+test('révision : un échec en position jouée jusqu’au bout est rejoué jusqu’au bout', () => {
+  const items = reviewItems([{ p: 'z', t: T0, ok: false, m: 'training' }, { p: 'w', t: T0, ok: false, m: 'storm' }]);
+  assert.equal(items.find((i) => i.id === 'z')!.full, true);
+  assert.equal(items.find((i) => i.id === 'w')!.full, false);
+});

@@ -31,7 +31,7 @@ const MODES: { id: HomeMode; icon: string; title: string; text: string }[] = [
     text: `${CONFIG.modes.storm.durationMs / 60000} min · +${CONFIG.modes.storm.bonusMs / 1000} s par réussite · −${CONFIG.modes.storm.penaltyMs / 1000} s par erreur`,
   },
   { id: 'streak', icon: '🔥', title: 'Streak', text: 'Difficulté croissante · la série s’arrête à la 1re erreur' },
-  { id: 'training', icon: '📚', title: 'Entraînement', text: 'Positions « Bases », sans chrono, jusqu’au mat' },
+  { id: 'training', icon: '📚', title: 'Entraînement', text: 'Technique jusqu’au bout et positions « Bases », sans chrono' },
 ];
 
 const LEVEL_LABEL: Record<Level, string> = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé', master: 'Master' };
@@ -65,6 +65,9 @@ interface Props {
   onStartRating: (r: number) => void;
   onStart: () => void;
   onTrain: (index: number) => void;
+  /** Mode technique : nombre de positions ≤ 7 pièces pour le thème, et lancement. */
+  techniqueCount: number | null;
+  onTechnique: () => void;
 }
 
 const subChip = (active: boolean) =>
@@ -234,7 +237,36 @@ export function HomeScreen(p: Props) {
           </div>
         </section>
       ) : (
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <>
+        <section className="mt-6 flex flex-col gap-3 rounded-xl bg-stone-800/60 p-4">
+          <h2 className="text-lg font-bold text-stone-50">🛠️ Technique : jouer jusqu’au bout</h2>
+          <p className="text-sm text-stone-400">
+            Une position de partie réelle (7 pièces ou moins), sans chrono, à mener jusqu’au mat — ou à tenir 20 coups quand
+            l’objectif est la nulle. Chaque coup est jugé par la table de finales.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {THEMES.filter((t) => t.id !== 'bases').map((t) => (
+              <button key={t.id} type="button" className={chip(p.theme === t.id)} onClick={() => p.onTheme(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={!p.techniqueCount}
+              onClick={p.onTechnique}
+              className="rounded-xl bg-amber-500 px-6 py-3 font-black text-stone-900 hover:bg-amber-400 disabled:opacity-40"
+            >
+              ▶ Position au hasard
+            </button>
+            <span className="text-sm text-stone-400">
+              {p.techniqueCount === null ? 'Chargement…' : `${p.techniqueCount} positions disponibles`}
+            </span>
+          </div>
+        </section>
+        <h2 className="mt-6 text-lg font-bold text-stone-50">📘 Bases (positions de référence)</h2>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {p.basics.map((b, i) => (
             <li key={b.id}>
               <button
@@ -255,6 +287,7 @@ export function HomeScreen(p: Props) {
             </li>
           ))}
         </ul>
+        </>
       )}
 
       {!p.compact && (

@@ -15,6 +15,7 @@ export interface AttemptLite {
   t: number;
   p: string;
   ok: boolean;
+  m?: string;
 }
 
 export interface ReviewItem {
@@ -25,6 +26,8 @@ export interface ReviewItem {
   lastT: number;
   /** Date (ms) à partir de laquelle le puzzle est à revoir. */
   due: number;
+  /** Le dernier échec venait d'une position jouée jusqu'au bout (entraînement / technique). */
+  full: boolean;
 }
 
 /** Puzzles ratés et pas encore acquis, du plus urgent au moins urgent. */
@@ -43,7 +46,14 @@ export function reviewItems(attempts: AttemptLite[]): ReviewItem[] {
     const streak = list.length - 1 - lastFail;
     if (streak >= MASTERED_AFTER) continue; // acquis
     const lastT = list[list.length - 1].t;
-    items.push({ id, failures: list.filter((a) => !a.ok).length, streak, lastT, due: lastT + REVIEW_INTERVAL_DAYS[streak] * DAY });
+    items.push({
+      id,
+      failures: list.filter((a) => !a.ok).length,
+      streak,
+      lastT,
+      due: lastT + REVIEW_INTERVAL_DAYS[streak] * DAY,
+      full: list[lastFail].m === 'training',
+    });
   }
   return items.sort((a, b) => a.due - b.due);
 }

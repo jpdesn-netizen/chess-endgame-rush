@@ -4,7 +4,8 @@
 // Choix documentés :
 //  - départ 1500, écart-type 500 (Lichess : « 1500 ± 1000 ») ; provisoire (« ? ») si écart-type > 110 ;
 //  - tau = 0,5 (l'article de Glickman conseille 0,3 à 1,2 ; valeur de son exemple) ;
-//  - seule la PREMIÈRE tentative de chaque puzzle compte (les rejouer n'influe pas), hors révision ;
+//  - seule la PREMIÈRE tentative de chaque puzzle compte (les rejouer n'influe pas), hors révision
+//    et hors mode technique (autre exercice : convertir jusqu'au bout) ;
 //  - l'écart-type des puzzles n'est pas conservé dans nos données : on prend 75 pour les puzzles
 //    Lichess (sélectionnés avec un écart-type ≤ 100 le plus souvent) et 200 pour les exercices
 //    générés (Elo estimé) ; les « Bases » (Elo estimé à la main) ne comptent pas.
@@ -40,7 +41,8 @@ export function ratingsByKey(attempts: RatedAttempt[]): Map<string, PlayerRating
   const state = new Map<string, { rating: Rating; games: number }>();
   const sorted = [...attempts].sort((a, b) => a.t - b.t);
   for (const a of sorted) {
-    if (a.m === 'review' || a.p.startsWith('bases-') || seen.has(a.p)) continue;
+    // Révision et positions jouées jusqu'au bout (entraînement / technique) : hors Elo.
+    if (a.m === 'review' || a.m === 'training' || a.p.startsWith('bases-') || seen.has(a.p)) continue;
     seen.add(a.p);
     for (const key of ['all', `f:${a.f}`, `c:${a.c}`]) {
       const cur = state.get(key) ?? { rating: START, games: 0 };
