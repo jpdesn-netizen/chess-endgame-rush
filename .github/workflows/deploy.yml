@@ -1,0 +1,51 @@
+# Tests + build à chaque envoi sur GitHub ; mise en ligne automatique sur
+# Cloudflare Pages quand tout est vert (branche main uniquement).
+# Secrets à créer dans GitHub (Settings → Secrets and variables → Actions) :
+#   CLOUDFLARE_API_TOKEN  (jeton Cloudflare : Account → Cloudflare Pages → Edit)
+#   CLOUDFLARE_ACCOUNT_ID (identifiant du compte Cloudflare)
+name: Tests et mise en ligne
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests-build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances (versions exactes du package-lock)
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Vulnérabilités critiques des dépendances
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Build
+        run: npm run build
+
+      - name: Mise en ligne sur Cloudflare Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=chess-endgame-rush
