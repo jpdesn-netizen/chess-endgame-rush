@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { subcategoryOf } from './core/categories';
-import { CONFIG } from './core/config';
+import { CONFIG, rushRules, TRAINING_RULES } from './core/config';
+import { dueNow, reviewItems } from './core/review';
 import { familyOf } from './core/material';
 import type { Puzzle } from './core/types';
 import { loadLichessPuzzles } from './data/lichessRepository';
@@ -17,8 +18,9 @@ import { useCloudAccount } from './hooks/useCloudAccount';
 import { openedFromEmailLink } from './services/cloud';
 import type { Run } from './services/playerStore';
 import { playerStore } from './services/players';
+import { getSettings, setSetting } from './services/settings';
 
-type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' };
+type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number };
 
 const embed = readEmbedOptions();
 
@@ -86,7 +88,7 @@ export default function App() {
   }, []);
 
   const onAttempt = useCallback(
-    (puzzle: Puzzle, success: boolean, m: 'storm' | 'streak' | 'training') => {
+    (puzzle: Puzzle, success: boolean, m: 'storm' | 'streak' | 'training' | 'review') => {
       if (!playerId) return;
       playerStore.addAttempt(playerId, {
         t: Date.now(),
@@ -123,6 +125,32 @@ export default function App() {
     [playerId, screen],
   );
 
+  // --- Révision des erreurs -------------------------------------------------
+  const puzzlesById = useMemo(() => new Map([...BASICS, ...(lichess ?? [])].map((p) => [p.id, p])), [lichess]);
+  const [spaced, setSpaced] = useState(() => getSettings().spacedRepetition);
+  const reviewAll = useMemo(
+    () => (playerId ? reviewItems(playerStore.history(playerId).attempts).filter((i) => puzzlesById.has(i.id)) : []),
+    // Recalculé à chaque changement d'écran (après une partie ou une révision).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [playerId, puzzlesById, screen],
+  );
+  const reviewDue = useMemo(() => (spaced ? dueNow(reviewAll, Date.now()) : reviewAll), [reviewAll, spaced]);
+  const reviewed = useRef(new Set<string>()); // une seule tentative comptée par puzzle et par révision
+  const startReview = useCallback((ids: string[]) => {
+    reviewed.current = new Set();
+    // Sans répétition espacée : ordre varié.
+    const list = spaced ? ids : [...ids].sort(() => Math.random() - 0.5);
+    if (list.length) setScreen({ name: 'review', ids: list, index: 0 });
+  }, [spaced]);
+  const onReviewAttempt = useCallback(
+    (p: Puzzle, ok: boolean) => {
+      if (reviewed.current.has(p.id)) return;
+      reviewed.current.add(p.id);
+      onAttempt(p, ok, 'review');
+    },
+    [onAttempt],
+  );
+
   const playerName = playerStore.listPlayers().find((p) => p.id === playerId)?.name ?? null;
 
   if (screen.name === 'privacy') {
@@ -144,6 +172,31 @@ export default function App() {
           setSub(subcategory);
           setScreen({ name: 'rush', run: Date.now() });
         }}
+      />,
+    );
+  }
+
+  if (screen.name === 'review') {
+    const id = screen.ids[screen.index];
+    const puzzle = puzzlesById.get(id);
+    const next = () =>
+      setScreen(screen.index + 1 < screen.ids.length ? { name: 'review', ids: screen.ids, index: screen.index + 1 } : { name: 'home' });
+    if (!puzzle) {
+      next();
+      return shell(null);
+    }
+    return shell(
+      <GameScreen
+        key={`${id}-${screen.index}`}
+        puzzle={puzzle}
+        position={{ index: screen.index, total: screen.ids.length }}
+        judge={judge}
+        rules={puzzle.solution ? rushRules(puzzle.solution) : TRAINING_RULES}
+        backLabel="← Arrêter la révision"
+        header={`🔁 Révision des erreurs · ${screen.index + 1}/${screen.ids.length} — sans chrono, la flèche montre le bon coup en cas d'erreur`}
+        onAttempt={onReviewAttempt}
+        onHome={() => setScreen({ name: 'home' })}
+        onNext={next}
       />,
     );
   }
@@ -173,6 +226,7 @@ export default function App() {
         scoreKey={key}
         judge={judge}
         recentlySeen={recentlySeen}
+        onReview={playerId ? startReview : undefined}
         onAttempt={onRushAttempt}
         onRunEnd={onRunEnd}
         onRestart={() => setScreen({ name: 'rush', run: screen.run + 1 })}
@@ -191,6 +245,12 @@ export default function App() {
       playerName={playerName}
       onProgress={() => setScreen({ name: 'progress' })}
       onPrivacy={() => setScreen({ name: 'privacy' })}
+      review={playerId && lichess ? { due: reviewDue.length, total: reviewAll.length, spaced } : null}
+      onReview={() => startReview(reviewDue.map((i) => i.id))}
+      onSpaced={(v) => {
+        setSetting('spacedRepetition', v);
+        setSpaced(v);
+      }}
       startRating={startRating}
       poolSize={pool ? pool.length : null}
       loadError={loadError}

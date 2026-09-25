@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Board, type MarkTone } from '../components/board/Board';
 import { feedbackFor, type Tone } from '../components/hud/feedback';
-import { TRAINING_RULES } from '../core/config';
+import { TRAINING_RULES, type ModeRules } from '../core/config';
 import { parseUci } from '../core/fen';
 import { materialSignature } from '../core/material';
 import type { Puzzle } from '../core/types';
@@ -23,10 +23,16 @@ interface Props {
   onAttempt?: (puzzle: Puzzle, success: boolean) => void;
   onNext: () => void;
   onHome: () => void;
+  /** Règles du puzzle (par défaut : entraînement jusqu'au bout). */
+  rules?: ModeRules;
+  /** Libellé du retour (par défaut : « Toutes les positions »). */
+  backLabel?: string;
+  /** Bandeau au-dessus du titre (ex. état de la révision). */
+  header?: string;
 }
 
-export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome }: Props) {
-  const { state, timings, playMove, reset } = usePuzzlePlayer(puzzle, TRAINING_RULES, judge);
+export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome, rules = TRAINING_RULES, backLabel = '← Toutes les positions', header }: Props) {
+  const { state, timings, playMove, reset } = usePuzzlePlayer(puzzle, rules, judge);
   const feedback = feedbackFor(state);
 
   // Archivage : première issue de chaque tentative (un « Recommencer » en crée une nouvelle).
@@ -78,7 +84,7 @@ export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome 
       <aside className="flex w-full flex-col gap-4">
         <div className="flex items-center justify-between text-sm text-stone-400">
           <button type="button" onClick={onHome} className="hover:text-stone-100">
-            ← Toutes les positions
+            {backLabel}
           </button>
           <span>
             {position.index + 1} / {position.total}
@@ -86,6 +92,7 @@ export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome 
         </div>
 
         <div>
+          {header && <p className="mb-1 text-sm font-semibold text-amber-300">{header}</p>}
           <h1 className="text-2xl font-bold text-stone-50">{puzzle.title}</h1>
           <p className="mt-1 text-sm text-stone-400">{materialSignature(puzzle.fen, state.playerColor)}</p>
         </div>
@@ -100,7 +107,7 @@ export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome 
           </span>
           <span className="rounded-full bg-stone-800 px-3 py-1 text-stone-300">
             Tu joues les {playerIsWhite ? 'Blancs' : 'Noirs'} · coup {state.playerMoveCount}
-            {puzzle.objective === 'draw' ? ` / ${TRAINING_RULES.drawHoldMoves}` : ''}
+            {puzzle.objective === 'draw' ? ` / ${rules.drawHoldMoves}` : rules.maxPlayerMoves ? ` / ${rules.maxPlayerMoves}` : ''}
           </span>
         </div>
 

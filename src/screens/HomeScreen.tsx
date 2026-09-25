@@ -48,6 +48,10 @@ interface Props {
   playerName: string | null;
   onProgress: () => void;
   onPrivacy: () => void;
+  /** Révision des erreurs (joueur sélectionné) : à revoir maintenant / en cours / mode. */
+  review: { due: number; total: number; spaced: boolean } | null;
+  onReview: () => void;
+  onSpaced: (on: boolean) => void;
   onSub: (s: string) => void;
   startRating: number;
   poolSize: number | null;
@@ -104,6 +108,36 @@ export function HomeScreen(p: Props) {
         </button>
         </div>
       </header>
+
+      {p.review && p.review.total > 0 && (
+        <section className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <div>
+            <div className="font-bold text-stone-50">
+              🔁 Révision des erreurs :{' '}
+              {p.review.spaced
+                ? `${p.review.due} à revoir aujourd’hui`
+                : `${p.review.total} erreur${p.review.total > 1 ? 's' : ''} à retravailler`}
+            </div>
+            <div className="text-xs text-stone-400">
+              {p.review.spaced
+                ? `Répétition espacée : un puzzle raté revient après 1, 3, 7 puis 14 jours ; acquis après 4 réussites. ${p.review.total} en cours.`
+                : 'Toutes vos erreurs non acquises, dans un ordre varié.'}
+            </div>
+            <label className="mt-2 flex items-center gap-2 text-xs text-stone-300">
+              <input type="checkbox" checked={p.review.spaced} onChange={(e) => p.onSpaced(e.target.checked)} />
+              Répétition espacée
+            </label>
+          </div>
+          <button
+            type="button"
+            disabled={p.review.due === 0}
+            onClick={p.onReview}
+            className="rounded-lg bg-amber-500 px-4 py-2 font-bold text-stone-900 hover:bg-amber-400 disabled:opacity-40"
+          >
+            {p.review.due === 0 ? 'Rien à revoir aujourd’hui' : '▶ Réviser'}
+          </button>
+        </section>
+      )}
 
       <section className="grid gap-3 sm:grid-cols-3">
         {MODES.map((m) => (

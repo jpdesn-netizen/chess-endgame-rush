@@ -17,6 +17,7 @@ const MODES = [
   { id: 'storm', label: 'Storm' },
   { id: 'streak', label: 'Streak' },
   { id: 'training', label: 'Entraînement' },
+  { id: 'review', label: 'Révision' },
   { id: '', label: 'Tous modes' },
 ];
 const PERIODS = [

@@ -23,6 +23,8 @@ interface Props {
   /** Archivage : une partie terminée. */
   /** Puzzles joués lors des parties récentes : évités tant qu'il reste du choix. */
   recentlySeen?: ReadonlySet<string>;
+  /** Revoir des puzzles (ids) sans chrono. */
+  onReview?: (ids: string[]) => void;
   onRunEnd?: (run: { mode: RushMode; theme: string; level: number; score: number; errors: number; bestCombo: number; highest?: number; played?: number; moves?: number; durationMs?: number }) => void;
   onRestart: () => void;
   onHome: () => void;
@@ -45,7 +47,7 @@ function preload<T>(promise: Promise<T>): Promise<T> {
   return promise;
 }
 
-export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, recentlySeen, onAttempt, onRunEnd, onRestart, onHome }: Props) {
+export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, recentlySeen, onAttempt, onRunEnd, onReview, onRestart, onHome }: Props) {
   const [rush, setRush] = useState<RushState>(() => startRush(mode, startRating));
   const [current, setCurrent] = useState<Puzzle | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -265,7 +267,7 @@ export function RushScreen({ mode, pool, theme, startRating, scoreKey, judge, re
           {rush.errors > 0 && ` · ${rush.errors} erreur${rush.errors > 1 ? 's' : ''}`}
         </p>
         {over ? (
-          <ResultPanel rush={rush} result={result} problem={problem} onRestart={onRestart} onHome={onHome} />
+          <ResultPanel rush={rush} result={result} problem={problem} onRestart={onRestart} onHome={onHome} onReview={onReview} />
         ) : (
           <button type="button" onClick={onHome} className="self-start text-sm text-stone-400 hover:text-stone-100">
             Abandonner
@@ -282,13 +284,16 @@ function ResultPanel({
   problem,
   onRestart,
   onHome,
+  onReview,
 }: {
   rush: RushState;
   result: { isRecord: boolean; previous: BestScore | null } | null;
   problem: string | null;
   onRestart: () => void;
   onHome: () => void;
+  onReview?: (ids: string[]) => void;
 }) {
+  const failedIds = [...new Set(rush.history.filter((h) => !h.success).map((h) => h.puzzleId))];
   const solved = rush.history.filter((h) => h.success);
   const best = solved.length ? Math.max(...solved.map((h) => h.rating)) : null;
   return (
@@ -316,9 +321,23 @@ function ResultPanel({
                 partie
               </a>
             )}
+            {!h.success && onReview && (
+              <button type="button" onClick={() => onReview([h.puzzleId])} className="text-amber-300 hover:underline">
+                revoir
+              </button>
+            )}
           </li>
         ))}
       </ul>
+      {onReview && failedIds.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onReview(failedIds)}
+          className="rounded-lg bg-stone-700 px-4 py-2 font-semibold text-amber-300 hover:bg-stone-600"
+        >
+          🔁 Revoir mes {failedIds.length} erreur{failedIds.length > 1 ? 's' : ''} sans chrono
+        </button>
+      )}
       <div className="flex gap-3">
         <button type="button" onClick={onRestart} className="flex-1 rounded-lg bg-amber-500 px-4 py-2 font-bold text-stone-900 hover:bg-amber-400">
           ↻ Rejouer
