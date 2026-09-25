@@ -150,7 +150,9 @@ export function useCloudAccount(
         ok(added ? `Synchronisé : ${added} entrée(s) récupérée(s) du compte.` : 'Synchronisé.');
       } catch (e) {
         linkedFor.current = null;
-        fail(e instanceof Error ? `Synchronisation impossible : ${e.message}` : e);
+        // Connexion réussie mais échange de données refusé : ne pas parler d'identifiants.
+        const code = (e as { code?: string } | null)?.code;
+        fail(`Connecté, mais synchronisation impossible${code ? ` (code : ${code})` : ''}. Vos parties restent enregistrées sur cet appareil ; réessayez plus tard.`);
       }
     })();
   }, [session, needMfa, recovery, playerId, store, onPlayerChange, syncProfile]);
@@ -252,8 +254,13 @@ export function useCloudAccount(
     syncNow: () =>
       run(async () => {
         if (!playerId || !linkedUser(playerId)) throw 'Ce profil n’est pas lié au compte.';
-        const added = await syncProfile(playerId);
-        ok(added ? `Synchronisé : ${added} entrée(s) récupérée(s).` : 'Synchronisé.');
+        try {
+          const added = await syncProfile(playerId);
+          ok(added ? `Synchronisé : ${added} entrée(s) récupérée(s).` : 'Synchronisé.');
+        } catch (e) {
+          const code = (e as { code?: string } | null)?.code;
+          throw `Synchronisation impossible${code ? ` (code : ${code})` : ''}. Vos parties restent enregistrées sur cet appareil.`;
+        }
       }),
 
     signOut: (everywhere) =>
