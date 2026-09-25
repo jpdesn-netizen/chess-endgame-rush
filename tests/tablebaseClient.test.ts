@@ -56,10 +56,12 @@ test('erreur réseau : nouvelles tentatives puis succès', async () => {
   assert.equal(calls, 3);
 });
 
-test('429 : erreur "rate-limited" sans nouvelle tentative, puis retrait du cache', async () => {
+test('429 : pause d’une minute entière sans aucune requête, puis reprise', async () => {
   let calls = 0;
+  let clock = 1_000_000;
   const client = createTablebaseClient({
     retryDelayMs: 1,
+    now: () => clock,
     fetchImpl: async () => {
       calls += 1;
       return calls === 1 ? new Response('', { status: 429 }) : okResponse();
@@ -67,8 +69,50 @@ test('429 : erreur "rate-limited" sans nouvelle tentative, puis retrait du cache
   });
   await assert.rejects(client.lookup(FEN), (e: unknown) => e instanceof TablebaseError && e.kind === 'rate-limited');
   assert.equal(calls, 1);
-  // Nouvel essai possible (l'échec n'est pas resté en cache).
-  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(client.paused(), true);
+  clock += 59_000;
+  await assert.rejects(client.lookup(FEN), (e: unknown) => e instanceof TablebaseError && e.kind === 'rate-limited');
+  assert.equal(calls, 1); // aucune requête pendant la pause
+  clock += 2_000;
   const pos = await client.lookup(FEN);
   assert.equal(pos.category, 'win');
+  assert.equal(calls, 2);
+});
+
+test('une seule requête à la fois, le joueur passe avant le préchargement', async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const order: string[] = [];
+  const client = createTablebaseClient({
+    fetchImpl: async (input) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      order.push(decodeURIComponent(String(input).split('fen=')[1]).split(' ')[0]);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight -= 1;
+      return okResponse();
+    },
+  });
+  const F = (k: string) => `8/8/8/4k3/8/8/${k}/3QK3 w - - 0 1`;
+  client.prefetch(F('8'));
+  client.prefetch(F('7P'));
+  await client.lookup(F('P7'));
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(maxInFlight, 1);
+  assert.deepEqual(order.map((o) => o.split('/')[6]), ['8', 'P7', '7P']); // la demande du joueur double le 2e préchargement
+});
+
+test('cache durable : une position déjà connue ne coûte aucune requête', async () => {
+  const store = new Map<string, unknown>();
+  let calls = 0;
+  const persistent = {
+    get: async (k: string) => store.get(k) as never,
+    set: (k: string, v: unknown) => void store.set(k, v),
+  };
+  const first = createTablebaseClient({ persistent, fetchImpl: async () => (calls++, okResponse()) });
+  await first.lookup(FEN);
+  const second = createTablebaseClient({ persistent, fetchImpl: async () => (calls++, okResponse()) });
+  const pos = await second.lookup(FEN);
+  assert.equal(pos.category, 'win');
+  assert.equal(calls, 1);
 });

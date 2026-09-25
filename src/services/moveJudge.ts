@@ -12,7 +12,7 @@ import { chooseDefense } from '../core/judge/opponent';
 import { judgeMove, type Verdict } from '../core/judge/tablebaseJudge';
 import type { Objective } from '../core/types';
 import type { Engine } from './stockfish';
-import type { TablebaseClient } from './tablebaseClient';
+import { TablebaseError, type TablebaseClient } from './tablebaseClient';
 
 export interface JudgeContext {
   objective: Objective;
@@ -66,20 +66,46 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
     });
   }
 
+  /**
+   * Repli : si la table de finales ne répond pas (réseau, pause après 429,
+   * erreur serveur), Stockfish prend le relais pour que la partie continue.
+   */
+  const unavailable = (e: unknown) =>
+    e instanceof TablebaseError && (e.kind === 'network' || e.kind === 'rate-limited' || e.kind === 'server');
+  const withFallback = async <T,>(viaTable: () => Promise<T>, viaEngine: () => Promise<T>): Promise<T> => {
+    try {
+      return await viaTable();
+    } catch (e) {
+      if (!unavailable(e)) throw e;
+      console.warn('[table de finales] indisponible, repli sur Stockfish :', (e as Error).message);
+      return viaEngine();
+    }
+  };
+
   return {
     source,
 
     judge(move, ctx) {
-      return source(move.fenBefore) === 'tablebase' ? judgeWithTablebase(move, ctx) : judgeWithEngine(move, ctx);
+      return source(move.fenBefore) === 'tablebase'
+        ? withFallback(
+            () => judgeWithTablebase(move, ctx),
+            () => judgeWithEngine(move, ctx),
+          )
+        : judgeWithEngine(move, ctx);
     },
 
     async reply(fen, ctx) {
       const expected = lineMove(ctx);
       if (source(fen) === 'tablebase') {
-        const position = await tablebase.lookup(fen);
-        const best = chooseDefense(position);
-        if (!best) return null;
-        return preferLineReply(position, best, ctx.previousUci, ctx.solution).uci;
+        return withFallback(
+          async () => {
+            const position = await tablebase.lookup(fen);
+            const best = chooseDefense(position);
+            if (!best) return null;
+            return preferLineReply(position, best, ctx.previousUci, ctx.solution).uci;
+          },
+          async () => (expected && applyUci(fen, expected) ? expected : (await engine.analyse(fen, movetime)).bestmove),
+        );
       }
       // Plus de 7 pièces : on rejoue la partie réelle tant qu'on la suit,
       // sinon le meilleur coup de Stockfish.
@@ -89,14 +115,19 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
     },
 
     async check(fen, objective) {
+      const viaEngine = async () => {
+        const cp = toCp((await engine.analyse(fen, movetime)).score);
+        return objective === 'win'
+          ? cp >= CONFIG.engine.winThresholdCp
+          : cp > -CONFIG.engine.winThresholdCp && cp < CONFIG.engine.winThresholdCp;
+      };
       if (source(fen) === 'tablebase') {
-        const outcome = outcomeOf((await tablebase.lookup(fen)).category);
-        return outcome === (objective === 'win' ? 'win' : 'draw');
+        return withFallback(async () => {
+          const outcome = outcomeOf((await tablebase.lookup(fen)).category);
+          return outcome === (objective === 'win' ? 'win' : 'draw');
+        }, viaEngine);
       }
-      const cp = toCp((await engine.analyse(fen, movetime)).score);
-      return objective === 'win'
-        ? cp >= CONFIG.engine.winThresholdCp
-        : cp > -CONFIG.engine.winThresholdCp && cp < CONFIG.engine.winThresholdCp;
+      return viaEngine();
     },
 
     prefetch(fen, ctx) {
