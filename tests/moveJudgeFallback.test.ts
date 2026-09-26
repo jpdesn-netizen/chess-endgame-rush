@@ -51,3 +51,17 @@ test('mauvais coup : la réponse adverse qui le punit est indiquée', async () =
   assert.equal(v.kind === 'bad' && v.refutation, 'Ke4');
   assert.equal(v.kind === 'bad' && v.bestMateIn, 11);
 });
+
+test('entraînement : entre défenses équivalentes, le coup préféré par Stockfish', async () => {
+  const { tbMove, tbPosition } = await import('./fixtures');
+  const table: TablebaseClient = {
+    lookup: async () => tbPosition('draw', [tbMove('e1f1', 'Kf1', 'draw', 0), tbMove('e1d2', 'Kd2', 'draw', 0), tbMove('e1d1', 'Kd1', 'win', 5)]),
+    prefetch: () => undefined,
+    paused: () => false,
+    stats: () => ({ requests: 0, cacheHits: 0, lastLatencyMs: null }),
+  };
+  // Le moteur de test préfère e1d2 : il est choisi, jamais e1d1 (qui offrirait le gain au joueur).
+  for (let i = 0; i < 5; i++) {
+    assert.equal(await createMoveJudge(table, engine).reply(FEN, { objective: 'draw', previousUci: [], vary: true }), 'e1d2');
+  }
+});

@@ -8,7 +8,7 @@ import { countPieces } from '../core/fen';
 import { judgeByEngine, toCp } from '../core/judge/engineJudge';
 import { applyLineTolerance, isOnLine, preferLineReply } from '../core/judge/lineRules';
 import { outcomeOf } from '../core/judge/outcome';
-import { chooseDefense, chooseVariedDefense } from '../core/judge/opponent';
+import { chooseDefense, strongestDefenses } from '../core/judge/opponent';
 import { judgeMove, type Verdict } from '../core/judge/tablebaseJudge';
 import type { Objective } from '../core/types';
 import type { Engine } from './stockfish';
@@ -20,7 +20,10 @@ export interface JudgeContext {
   previousUci: string[];
   /** Ligne de la partie réelle (UCI), si connue. */
   solution?: string[];
-  /** Entraînement : défense variée (parmi les coups de même valeur), sans rejouer la partie réelle. */
+  /**
+   * Entraînement : défense la plus forte selon la table, départagée par Stockfish
+   * entre coups équivalents (sans rejouer la partie réelle).
+   */
   vary?: boolean;
 }
 
@@ -84,6 +87,23 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
     }
   };
 
+  /**
+   * Parmi des coups que la table juge équivalents, celui que Stockfish préfère
+   * (le plus coriace en pratique) ; null si Stockfish ne répond pas en 2,5 s
+   * ou préfère un autre coup.
+   */
+  async function engineChoice(fen: string, candidates: string[]): Promise<string | null> {
+    try {
+      const bestmove = await Promise.race([
+        engine.analyse(fen, movetime).then((a) => a.bestmove),
+        new Promise<null>((r) => setTimeout(() => r(null), 2_500)),
+      ]);
+      return bestmove && candidates.includes(bestmove) ? bestmove : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Meilleure réponse adverse (SAN) après un mauvais coup ; rien si indisponible en 1,5 s. */
   async function refute(fen: string): Promise<string | undefined> {
     const find = async () => {
@@ -126,7 +146,12 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
         return withFallback(
           async () => {
             const position = await tablebase.lookup(fen);
-            if (ctx.vary) return chooseVariedDefense(position)?.uci ?? null;
+            if (ctx.vary) {
+              const ties = strongestDefenses(position);
+              if (ties.length <= 1) return ties[0]?.uci ?? null;
+              const choice = await engineChoice(fen, ties.map((m) => m.uci));
+              return choice ?? ties[Math.floor(Math.random() * ties.length)].uci;
+            }
             const best = chooseDefense(position);
             if (!best) return null;
             return preferLineReply(position, best, ctx.previousUci, ctx.solution).uci;
