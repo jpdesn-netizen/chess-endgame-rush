@@ -89,3 +89,18 @@ test('RESET revient à la position de départ', () => {
   assert.equal(s2.fen, s0.fen);
   assert.equal(s2.phase, 'awaitingPlayer');
 });
+
+test('entraînement : reprendre le mauvais coup ramène à la position d’avant', () => {
+  const s0 = initialSession(puzzle('8/8/8/4k3/8/8/8/3QK3 w - - 0 1', 'win'), RULES);
+  const bad: Verdict = { kind: 'bad', san: 'Qd6+', reason: 'throws-win', outcome: 'draw', bestMoves: ['Qd7'], bestUci: ['d1d7'] };
+  const failed = play(s0, 'd1', 'd6', bad);
+  const back = sessionReducer(failed, { type: 'TAKEBACK' });
+  assert.equal(back.phase, 'awaitingPlayer');
+  assert.equal(back.fen, s0.fen);
+  assert.equal(back.moves.length, 0);
+  assert.equal(back.playerMoveCount, 0);
+  assert.deepEqual(back.seen, s0.seen);
+  assert.equal(back.takebacks, 1);
+  // Sans échec par mauvais coup, la reprise est sans effet.
+  assert.equal(sessionReducer(s0, { type: 'TAKEBACK' }), s0);
+});

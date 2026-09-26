@@ -32,3 +32,22 @@ test('erreur qui n’est pas une indisponibilité : pas de repli silencieux', as
   const judge = createMoveJudge(deadTable('bad-request'), engine);
   await assert.rejects(judge.check(FEN, 'win'));
 });
+
+test('mauvais coup : la réponse adverse qui le punit est indiquée', async () => {
+  const { applyMove } = await import('../src/core/chessRules');
+  const { tbMove, tbPosition } = await import('./fixtures');
+  const move = applyMove(FEN, 'e1', 'f1')!;
+  const table: TablebaseClient = {
+    lookup: async (fen) =>
+      fen === FEN
+        ? tbPosition('win', [tbMove('e1d2', 'Kd2', 'loss', -20), tbMove('e1f1', 'Kf1', 'draw', 0)], 21)
+        : tbPosition('draw', [tbMove('e5e4', 'Ke4', 'draw', 0)]),
+    prefetch: () => undefined,
+    paused: () => false,
+    stats: () => ({ requests: 0, cacheHits: 0, lastLatencyMs: null }),
+  };
+  const v = await createMoveJudge(table, engine).judge(move, { objective: 'win', previousUci: [] });
+  assert.equal(v.kind, 'bad');
+  assert.equal(v.kind === 'bad' && v.refutation, 'Ke4');
+  assert.equal(v.kind === 'bad' && v.bestMateIn, 11);
+});

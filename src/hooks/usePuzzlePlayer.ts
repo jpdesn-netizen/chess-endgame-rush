@@ -42,6 +42,12 @@ export function usePuzzlePlayer(puzzle: Puzzle, rules: ModeRules, judge: MoveJud
     dispatch({ type: 'RESET' });
   }, []);
 
+  /** Reprend le mauvais coup (entraînement) : la position d'avant est déjà en cache. */
+  const takeBack = useCallback(() => {
+    token.current += 1;
+    dispatch({ type: 'TAKEBACK' });
+  }, []);
+
   const playMove = useCallback(
     (from: string, to: string, promotion?: PromotionPiece): boolean => {
       const current = stateRef.current;
@@ -95,5 +101,5 @@ export function usePuzzlePlayer(puzzle: Puzzle, rules: ModeRules, judge: MoveJud
     [judge, puzzle, onPlayerMove],
   );
 
-  return { state, timings, playMove, reset };
+  return { state, timings, playMove, reset, takeBack };
 }

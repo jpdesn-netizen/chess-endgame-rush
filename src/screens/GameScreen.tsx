@@ -32,7 +32,7 @@ interface Props {
 }
 
 export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome, rules = TRAINING_RULES, backLabel = '← Toutes les positions', header }: Props) {
-  const { state, timings, playMove, reset } = usePuzzlePlayer(puzzle, rules, judge);
+  const { state, timings, playMove, reset, takeBack } = usePuzzlePlayer(puzzle, rules, judge);
   const feedback = feedbackFor(state);
 
   // Archivage : première issue de chaque tentative (un « Recommencer » en crée une nouvelle).
@@ -114,6 +114,11 @@ export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome,
         <div className={`rounded-xl px-4 py-3 ${TONE_CLASS[feedback.tone]}`} role="status" aria-live="polite">
           <p className="font-semibold">{feedback.title}</p>
           {feedback.detail && <p className="mt-1 text-sm opacity-90">{feedback.detail}</p>}
+          {state.phase === 'solved' && state.takebacks > 0 && (
+            <p className="mt-1 text-sm opacity-90">
+              Réussi après {state.takebacks} correction{state.takebacks > 1 ? 's' : ''} : recommence depuis le début pour la valider ✅.
+            </p>
+          )}
         </div>
 
         <p className="rounded-xl bg-stone-800/60 px-4 py-3 text-sm text-stone-300">💡 {puzzle.concept}</p>
@@ -128,7 +133,17 @@ export function GameScreen({ puzzle, position, judge, onAttempt, onNext, onHome,
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          {state.phase === 'failed' && state.endReason === 'bad-move' && (
+            <button
+              type="button"
+              onClick={takeBack}
+              className="rounded-lg bg-sky-500 px-4 py-2 font-semibold text-stone-900 hover:bg-sky-400"
+              title="Annule ton dernier coup et rejoue depuis la position d’avant"
+            >
+              ↶ Réessayer ce coup
+            </button>
+          )}
           <button type="button" onClick={reset} className="rounded-lg bg-stone-700 px-4 py-2 font-semibold text-stone-100 hover:bg-stone-600">
             ↺ Recommencer
           </button>

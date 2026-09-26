@@ -84,16 +84,40 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
     }
   };
 
+  /** Meilleure réponse adverse (SAN) après un mauvais coup ; rien si indisponible en 1,5 s. */
+  async function refute(fen: string): Promise<string | undefined> {
+    const find = async () => {
+      if (source(fen) === 'tablebase') {
+        const best = chooseDefense(await tablebase.lookup(fen));
+        if (best) return best.san;
+      }
+      const bestmove = (await engine.analyse(fen, movetime)).bestmove;
+      return bestmove ? applyUci(fen, bestmove)?.san : undefined;
+    };
+    try {
+      return await Promise.race([find(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 1_500))]);
+    } catch {
+      return undefined;
+    }
+  }
+
   return {
     source,
 
-    judge(move, ctx) {
-      return source(move.fenBefore) === 'tablebase'
-        ? withFallback(
-            () => judgeWithTablebase(move, ctx),
-            () => judgeWithEngine(move, ctx),
-          )
-        : judgeWithEngine(move, ctx);
+    async judge(move, ctx) {
+      const verdict =
+        source(move.fenBefore) === 'tablebase'
+          ? await withFallback(
+              () => judgeWithTablebase(move, ctx),
+              () => judgeWithEngine(move, ctx),
+            )
+          : await judgeWithEngine(move, ctx);
+      // Coup perdant ou qui gâche le gain : montrer la réponse adverse qui le punit.
+      if (verdict.kind === 'bad' && verdict.reason !== 'too-slow') {
+        const refutation = await refute(move.fen);
+        if (refutation) return { ...verdict, refutation };
+      }
+      return verdict;
     },
 
     async reply(fen, ctx) {

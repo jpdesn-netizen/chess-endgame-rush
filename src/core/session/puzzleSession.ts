@@ -47,6 +47,8 @@ export interface SessionState {
   verdict: Verdict | null;
   endReason: EndReason | null;
   error: string | null;
+  /** Nombre de mauvais coups repris (entraînement). */
+  takebacks: number;
 }
 
 export type SessionEvent =
@@ -54,7 +56,9 @@ export type SessionEvent =
   | { type: 'VERDICT'; verdict: Verdict }
   | { type: 'OPPONENT_MOVED'; move: AppliedMove }
   | { type: 'ERROR'; message: string }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  /** Entraînement : annuler le mauvais coup et rejouer depuis la position d'avant. */
+  | { type: 'TAKEBACK' };
 
 export function initialSession(puzzle: Puzzle, rules: ModeRules): SessionState {
   return {
@@ -71,6 +75,7 @@ export function initialSession(puzzle: Puzzle, rules: ModeRules): SessionState {
     verdict: null,
     endReason: null,
     error: null,
+    takebacks: 0,
   };
 }
 
@@ -95,6 +100,29 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
 
     case 'ERROR':
       return { ...state, phase: 'error', error: event.message };
+
+    case 'TAKEBACK': {
+      const bad = state.lastPlayerMove;
+      if (state.phase !== 'failed' || state.endReason !== 'bad-move' || !bad) return state;
+      const moves = state.moves.slice(0, -1);
+      const prev = moves.at(-1);
+      const lastMove = prev
+        ? { from: prev.uci.slice(0, 2), to: prev.uci.slice(2, 4) }
+        : initialSession(state.puzzle, state.rules).lastMove;
+      return {
+        ...state,
+        fen: bad.fenBefore,
+        seen: state.seen.slice(0, -1),
+        moves,
+        playerMoveCount: state.playerMoveCount - 1,
+        lastMove,
+        lastPlayerMove: null,
+        phase: 'awaitingPlayer',
+        verdict: null,
+        endReason: null,
+        takebacks: state.takebacks + 1,
+      };
+    }
 
     case 'PLAYER_MOVED': {
       if (state.phase !== 'awaitingPlayer') return state;

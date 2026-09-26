@@ -30,7 +30,12 @@ export function feedbackFor(state: SessionState): Feedback {
 
   if (phase === 'failed') {
     if (verdict?.kind === 'bad') {
-      const best = verdict.bestMoves.length ? `Coup(s) juste(s) : ${verdict.bestMoves.join(', ')}` : undefined;
+      const mate = verdict.bestMateIn ? ` (mat en ${verdict.bestMateIn})` : '';
+      const justs = verdict.bestMoves.length
+        ? `${verdict.bestMoves.length > 1 ? 'Coups justes' : 'Coup juste'} : ${verdict.bestMoves[0]}${mate}${verdict.bestMoves.length > 1 ? `, ${verdict.bestMoves.slice(1).join(', ')}` : ''}`
+        : '';
+      const punish = verdict.refutation ? `Après ${verdict.san}, l’adversaire répond ${verdict.refutation}.` : '';
+      const best = [justs && `${justs}.`, punish].filter(Boolean).join(' ') || undefined;
       if (verdict.reason === 'too-slow') {
         return {
           tone: 'bad',

@@ -83,3 +83,10 @@ test('correctMoves trie les coups gagnants du plus rapide au plus lent', () => {
 test('coup inconnu de la table : null', () => {
   assert.equal(judgeMove(WIN, 'h1h8', OPTS), null);
 });
+
+test('mauvais coup : le meilleur coup indique « mat en N » quand la table donne la distance au mat', () => {
+  const v = judgeMove(WIN, 'd1d6', OPTS);
+  assert.equal(v?.kind, 'bad');
+  // Qd7 : l'adversaire est maté en 12 demi-coups → mat en 12/2 + 1 = 7 coups.
+  assert.equal(v?.kind === 'bad' && v.bestMateIn, 7);
+});

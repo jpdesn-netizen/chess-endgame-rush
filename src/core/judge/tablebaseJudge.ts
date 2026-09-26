@@ -25,6 +25,10 @@ export type Verdict =
       /** Coups corrects (SAN), du meilleur au moins bon, 3 au maximum. */
       bestMoves: string[];
       bestUci: string[];
+      /** Objectif gain : le meilleur coup matait en N coups (table avec distance au mat). */
+      bestMateIn?: number;
+      /** Réponse adverse qui punit le coup joué (SAN), si connue. */
+      refutation?: string;
     };
 
 export interface JudgeOptions {
@@ -44,6 +48,16 @@ function chooseMetric(winningMoves: TbMove[]): Metric {
   return winningMoves.every((m) => m.dtm !== null) ? 'dtm' : 'dtz';
 }
 
+/**
+ * Mat en N coups (du camp qui joue `move`), d'après la distance au mat de la
+ * position obtenue, exprimée en demi-coups du point de vue de l'adversaire.
+ */
+export function mateInAfter(move: TbMove): number | undefined {
+  if (move.checkmate) return 1;
+  if (move.dtm === null || outcomeOf(move.category) !== 'loss') return undefined;
+  return Math.floor(Math.abs(move.dtm) / 2) + 1;
+}
+
 /** Coups atteignant au moins le résultat requis, triés du meilleur au moins bon. */
 export function correctMoves(position: TbPosition): TbMove[] {
   const required = outcomeOf(position.category);
@@ -60,7 +74,12 @@ export function judgeMove(position: TbPosition, uci: string, options: JudgeOptio
   const required = outcomeOf(position.category);
   const after = outcomeAfterMove(played);
   const best = correctMoves(position);
-  const bestList = { bestMoves: best.slice(0, 3).map((m) => m.san), bestUci: best.slice(0, 3).map((m) => m.uci) };
+  const mate = required === 'win' && best[0] ? mateInAfter(best[0]) : undefined;
+  const bestList = {
+    bestMoves: best.slice(0, 3).map((m) => m.san),
+    bestUci: best.slice(0, 3).map((m) => m.uci),
+    ...(mate !== undefined ? { bestMateIn: mate } : {}),
+  };
 
   // Position inconnue de la table : impossible de juger, on accepte.
   if (required === 'unknown') {
