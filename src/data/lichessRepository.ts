@@ -2,22 +2,9 @@
 // produit par scripts/import-lichess.ts). Chargé une seule fois.
 
 import { FAMILY_LABEL, familyOf } from '../core/material';
-import type { Family, Puzzle } from '../core/types';
+import type { Puzzle } from '../core/types';
+import { readPuzzleFile, type RawPuzzle } from './puzzleFormat';
 
-interface RawPuzzle {
-  id: string;
-  fen: string;
-  lastMove: string;
-  solution: string[];
-  rating: number;
-  objective: 'win' | 'draw';
-  family: Family;
-  pieces?: number;
-  themes: string[];
-  gameUrl: string;
-  /** Exercices générés avec la table de finales : Elo estimé. */
-  ratingEstimated?: boolean;
-}
 
 const THEME_FR: Record<string, string> = {
   advancedPawn: 'pion avancé',
@@ -114,8 +101,7 @@ async function fetchPuzzles(file: string, optional: boolean): Promise<RawPuzzle[
     if (optional) return [];
     throw new Error(`Chargement des finales Lichess impossible (HTTP ${r.status}).`);
   }
-  const data = (await r.json()) as { puzzles: RawPuzzle[] };
-  return data.puzzles;
+  return readPuzzleFile(await r.json());
 }
 
 /**

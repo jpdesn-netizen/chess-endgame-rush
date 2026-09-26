@@ -1,6 +1,6 @@
 // Import des finales de la base de puzzles Lichess (licence CC0), v2.
 // Usage : npx tsx scripts/import-lichess.ts lichess_db_puzzle.csv/lichess_db_puzzle.csv
-// Sortie : public/data/lichess-endgames.json
+// Sortie : public/data/lichess-endgames.json (format compact, voir src/data/puzzleFormat.ts)
 //
 // Objectif : au moins MIN_PER_SUB exercices par sous-thème proposé dans
 // l'appli, répartis sur les tranches d'Elo, avec l'Elo le plus fiable possible.
@@ -27,6 +27,8 @@ import { createInterface } from 'node:readline';
 import { Chess } from 'chess.js';
 import { SUBCATEGORIES, subcategoryOf } from '../src/core/categories';
 import { familyOf } from '../src/core/material';
+import type { Family } from '../src/core/types';
+import { encodePuzzles } from '../src/data/puzzleFormat';
 
 const input = process.argv[2];
 if (!input) {
@@ -58,7 +60,7 @@ interface Item {
   popularity: number;
   tier: number;
   objective: 'win' | 'draw';
-  family: string;
+  family: Family;
   pieces: number;
   themes: string[];
   gameUrl: string;
@@ -151,11 +153,15 @@ selected.sort((a, b) => a.rating - b.rating);
 mkdirSync('public/data', { recursive: true });
 writeFileSync(
   'public/data/lichess-endgames.json',
-  JSON.stringify({
-    source: 'Lichess puzzle database (CC0) — https://database.lichess.org/#puzzles',
-    generated: new Date().toISOString().slice(0, 10),
-    minPerSubcategory: MIN_PER_SUB,
-    puzzles: selected.map(({ popularity: _p, tier: _t, ...rest }) => rest),
-  }),
+  JSON.stringify(
+    encodePuzzles(
+      selected.map(({ popularity: _p, tier: _t, ...rest }) => rest),
+      {
+        source: 'Lichess puzzle database (CC0) — https://database.lichess.org/#puzzles',
+        generated: new Date().toISOString().slice(0, 10),
+        minPerSubcategory: MIN_PER_SUB,
+      },
+    ),
+  ),
 );
 console.log(`\n${total} lignes lues, ${eligible} finales éligibles, ${selected.length} retenues → public/data/lichess-endgames.json`);
