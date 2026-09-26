@@ -232,6 +232,21 @@ export default function App() {
     [onAttempt],
   );
 
+  // Positions « Bases » déjà réussies (entraînement) par ce joueur.
+  const basicsDone = useMemo(
+    () =>
+      new Set(
+        playerId
+          ? playerStore
+              .history(playerId)
+              .attempts.filter((a) => a.ok && a.p.startsWith('bases-'))
+              .map((a) => a.p)
+          : [],
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recalculé au retour à l'accueil
+    [playerId, screen],
+  );
+
   const playerName = playerStore.listPlayers().find((p) => p.id === playerId)?.name ?? null;
 
   if (screen.name === 'privacy') {
@@ -384,6 +399,7 @@ export default function App() {
       loadError={loadError}
       best={mode === 'training' ? null : getBest(key)}
       basics={BASICS}
+      basicsDone={basicsDone}
       onMode={setMode}
       onTheme={(t) => {
         setTheme(t);

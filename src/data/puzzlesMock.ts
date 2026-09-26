@@ -1,6 +1,8 @@
-// Collection « Bases » : 11 positions théoriques.
-// Chaque FEN a été vérifié le 23/09/2026 avec la table de finales Lichess
-// (résultat théorique conforme à `objective`). Revérification : npm run verify:puzzles
+// Collection « Bases » : 17 positions théoriques (classées par difficulté).
+// Les 11 premières ont été vérifiées le 23/09/2026 avec la table de finales Lichess ;
+// les 6 ajoutées le 26/09/2026 (Réti, pion éloigné, mauvais fou, pat dame/pion,
+// Vancura, fou + cavalier) ont été contrôlées avec Stockfish, à confirmer par la table.
+// Vérification (résultat théorique conforme à `objective`) : npm run verify:puzzles
 // Les `rating` sont des ESTIMATIONS à recalibrer ; ils servent seulement à
 // ordonner la difficulté.
 
@@ -68,6 +70,16 @@ export const PUZZLES_MOCK: Puzzle[] = [
     concept: 'Le pion resté en arrière offre un temps de réserve pour reprendre l’opposition.',
   },
   {
+    id: 'bases-pion-eloigne',
+    title: 'Pion passé éloigné',
+    fen: '8/8/3k4/6p1/P2K2P1/8/8/8 w - - 0 1',
+    objective: 'win',
+    collection: 'bases',
+    level: 'intermediaire',
+    rating: 1100,
+    concept: 'Ton pion a attire le roi adverse sur l’aile dame : pendant ce temps, ton roi file gagner le pion g5.',
+  },
+  {
     id: 'bases-dame-contre-pion',
     title: 'Dame contre pion en 7e',
     fen: '8/8/8/8/1K6/8/3pk3/7Q w - - 0 1',
@@ -78,6 +90,16 @@ export const PUZZLES_MOCK: Puzzle[] = [
     concept: 'Échecs et clouages forcent le roi adverse devant son pion ; ton roi gagne alors un temps pour approcher.',
   },
   {
+    id: 'bases-mauvais-fou',
+    title: 'Fou de la mauvaise couleur',
+    fen: '8/3k4/8/PK6/8/2B5/8/8 b - - 0 1',
+    objective: 'draw',
+    collection: 'bases',
+    level: 'intermediaire',
+    rating: 1200,
+    concept: 'Le fou ne contrôle pas la case de promotion a8 : file vers ce coin, le roi blanc ne pourra plus t’en déloger.',
+  },
+  {
     id: 'bases-tour-contre-pion',
     title: 'Tour contre pion',
     fen: '8/8/8/8/8/2k5/3p4/K2R4 w - - 0 1',
@@ -86,6 +108,16 @@ export const PUZZLES_MOCK: Puzzle[] = [
     level: 'intermediaire',
     rating: 1250,
     concept: 'Un seul coup gagne : trouve comment empêcher la promotion sans perdre ta tour.',
+  },
+  {
+    id: 'bases-dame-pion-pat',
+    title: 'Dame contre pion de fou : le pat',
+    fen: '6K1/8/8/8/1Q6/8/1kp5/8 b - - 0 1',
+    objective: 'draw',
+    collection: 'bases',
+    level: 'intermediaire',
+    rating: 1300,
+    concept: 'Avec un pion en c2, le coin a1 est un refuge : si la dame prend le pion, c’est pat.',
   },
   {
     id: 'bases-lucena',
@@ -108,6 +140,16 @@ export const PUZZLES_MOCK: Puzzle[] = [
     concept: 'Garde ta tour sur la 6e rangée ; quand le pion avance, va donner des échecs par l’arrière.',
   },
   {
+    id: 'bases-reti',
+    title: 'L’étude de Réti',
+    fen: '7K/8/k1P5/7p/8/8/8/8 w - - 0 1',
+    objective: 'draw',
+    collection: 'bases',
+    level: 'avance',
+    rating: 1550,
+    concept: 'En marchant en diagonale, ton roi poursuit deux buts à la fois : rattraper le pion noir et soutenir le tien.',
+  },
+  {
     id: 'bases-mat-deux-fous',
     title: 'Mat des deux fous',
     fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1',
@@ -116,5 +158,25 @@ export const PUZZLES_MOCK: Puzzle[] = [
     level: 'avance',
     rating: 1600,
     concept: 'Les fous côte à côte forment une barrière ; repousse le roi vers un coin avec l’aide de ton roi.',
+  },
+  {
+    id: 'bases-vancura',
+    title: 'Défense Vancura',
+    fen: 'R7/6k1/P4r2/8/8/2K5/8/8 b - - 0 1',
+    objective: 'draw',
+    collection: 'bases',
+    level: 'avance',
+    rating: 1700,
+    concept: 'Ta tour attaque le pion de côté, sur la 6e rangée ; la tour blanche reste coincée devant lui et ton roi garde g7/h7.',
+  },
+  {
+    id: 'bases-mat-fou-cavalier',
+    title: 'Mat du fou et du cavalier',
+    fen: '8/8/8/4k3/8/8/8/2B1KN2 w - - 0 1',
+    objective: 'win',
+    collection: 'bases',
+    level: 'master',
+    rating: 2000,
+    concept: 'Seul un coin de la couleur du fou permet le mat (ici a1 ou h8, cases noires) : repousse le roi vers l’un d’eux.',
   },
 ];

@@ -62,6 +62,8 @@ interface Props {
   loadError: string | null;
   best: BestScore | null;
   basics: Puzzle[];
+  /** Identifiants des positions « Bases » déjà réussies. */
+  basicsDone: Set<string>;
   onMode: (m: HomeMode) => void;
   onTheme: (t: ThemeChoice) => void;
   onStartRating: (r: number | null) => void;
@@ -311,7 +313,13 @@ export function HomeScreen(p: Props) {
             </span>
           </div>
         </section>
-        <h2 className="mt-6 text-lg font-bold text-stone-50">📘 Bases (positions de référence)</h2>
+        <h2 className="mt-6 text-lg font-bold text-stone-50">
+          📘 Bases (positions de référence){' '}
+          <span className="text-sm font-semibold text-stone-400">
+            · {p.basics.filter((b) => p.basicsDone.has(b.id)).length}/{p.basics.length} réussies
+          </span>
+        </h2>
+        <p className="mt-1 text-sm text-stone-400">Les classiques à connaître, du plus simple au plus difficile, à jouer jusqu’au bout contre la table de finales.</p>
         <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {p.basics.map((b, i) => (
             <li key={b.id}>
@@ -320,7 +328,10 @@ export function HomeScreen(p: Props) {
                 onClick={() => p.onTrain(i)}
                 className="flex h-full w-full flex-col gap-2 rounded-xl bg-stone-800 p-4 text-left transition hover:bg-stone-700"
               >
-                <span className="font-semibold text-stone-50">{b.title}</span>
+                <span className="font-semibold text-stone-50">
+                  {p.basicsDone.has(b.id) && <span title="Déjà réussie">✅ </span>}
+                  {b.title}
+                </span>
                 <span className="text-sm text-stone-400">{materialSignature(b.fen, sideToMove(b.fen))}</span>
                 <span className="mt-auto flex flex-wrap gap-2 text-xs font-semibold">
                   <span className={`rounded-full px-2 py-0.5 ${b.objective === 'win' ? 'bg-amber-500 text-stone-900' : 'bg-sky-500 text-stone-900'}`}>
