@@ -16,6 +16,13 @@ const deadTable = (kind: 'rate-limited' | 'network' | 'bad-request'): TablebaseC
 });
 const engine: Engine = {
   analyse: async () => ({ bestmove: 'e1d2', score: { cp: 900 }, pv: ['e1d2'] }),
+  // Le moteur de test trouve e1d2 et e1f1 presque équivalents, e1e2 nettement moins bon.
+  rank: async (_fen, moves) =>
+    [
+      { move: 'e1d2', score: { cp: 30 } },
+      { move: 'e1f1', score: { cp: 20 } },
+      { move: 'e1e2', score: { cp: -80 } },
+    ].filter((l) => moves.includes(l.move)),
   prefetch: () => undefined,
   ready: async () => undefined,
 };
@@ -52,16 +59,22 @@ test('mauvais coup : la réponse adverse qui le punit est indiquée', async () =
   assert.equal(v.kind === 'bad' && v.bestMateIn, 11);
 });
 
-test('entraînement : entre défenses équivalentes, le coup préféré par Stockfish', async () => {
+test('entraînement (nulle) : tirage entre les coups que Stockfish juge presque aussi bons', async () => {
   const { tbMove, tbPosition } = await import('./fixtures');
   const table: TablebaseClient = {
-    lookup: async () => tbPosition('draw', [tbMove('e1f1', 'Kf1', 'draw', 0), tbMove('e1d2', 'Kd2', 'draw', 0), tbMove('e1d1', 'Kd1', 'win', 5)]),
+    lookup: async () =>
+      tbPosition('draw', [
+        tbMove('e1f1', 'Kf1', 'draw', 0),
+        tbMove('e1d2', 'Kd2', 'draw', 0),
+        tbMove('e1e2', 'Ke2', 'draw', 0),
+        tbMove('e1d1', 'Kd1', 'win', 5), // offrirait le gain au joueur : jamais
+      ]),
     prefetch: () => undefined,
     paused: () => false,
     stats: () => ({ requests: 0, cacheHits: 0, lastLatencyMs: null }),
   };
-  // Le moteur de test préfère e1d2 : il est choisi, jamais e1d1 (qui offrirait le gain au joueur).
-  for (let i = 0; i < 5; i++) {
-    assert.equal(await createMoveJudge(table, engine).reply(FEN, { objective: 'draw', previousUci: [], vary: true }), 'e1d2');
-  }
+  const judge = createMoveJudge(table, engine);
+  const seen = new Set<string | null>();
+  for (let i = 0; i < 40; i++) seen.add(await judge.reply(FEN, { objective: 'draw', previousUci: [], vary: true }));
+  assert.deepEqual([...seen].sort(), ['e1d2', 'e1f1']); // variété, jamais Ke2 (trop faible) ni Kd1
 });

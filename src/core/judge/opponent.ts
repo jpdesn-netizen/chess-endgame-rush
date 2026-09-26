@@ -1,6 +1,8 @@
 // Choix de la réponse adverse : la défense la plus résistante selon la table.
 
 import { outcomeOf, rankOf } from './outcome';
+import type { RankedMove } from '../../services/stockfish';
+import { toCp } from './engineJudge';
 import type { TbMove, TbPosition } from './tablebaseTypes';
 
 /**
@@ -33,12 +35,14 @@ export function chooseDefense(position: TbPosition): TbMove | null {
 }
 
 /**
- * Entraînement : toutes les défenses EXACTEMENT aussi fortes que la meilleure
- * (même résultat et, si le joueur gagne ou perd, même distance). En position
- * nulle, la table ne distingue pas les coups qui gardent la nulle : ils sont
- * tous renvoyés, et c'est Stockfish qui choisit le plus coriace (moveJudge).
+ * Entraînement : défenses quasi aussi fortes que la meilleure, pour que
+ * l'adversaire ne rejoue pas toujours la même séquence :
+ *  - même résultat pour le joueur que la meilleure défense (jamais un cadeau) ;
+ *  - joueur gagnant : mat (ou conversion) retardé au plus `toleranceMoves` coup de moins que le maximum ;
+ *  - joueur perdant : gain adverse au plus `toleranceMoves` coup plus lent ;
+ *  - nulle : tous les coups qui la gardent (Stockfish choisit ensuite parmi les plus coriaces).
  */
-export function strongestDefenses(position: TbPosition): TbMove[] {
+export function strongestDefenses(position: TbPosition, toleranceMoves = 1): TbMove[] {
   const best = chooseDefense(position);
   if (!best) return [];
   const outcome = outcomeOf(best.category);
@@ -47,5 +51,22 @@ export function strongestDefenses(position: TbPosition): TbMove[] {
     const v = hasDtm ? m.dtm : m.dtz;
     return v === null ? 0 : Math.abs(v);
   };
-  return position.moves.filter((m) => outcomeOf(m.category) === outcome && (outcome === 'draw' || dist(m) === dist(best)));
+  const plies = toleranceMoves * 2;
+  return position.moves.filter((m) => {
+    if (outcomeOf(m.category) !== outcome) return false;
+    if (outcome === 'win') return dist(m) >= dist(best) - plies;
+    if (outcome === 'loss') return dist(m) <= dist(best) + plies;
+    return true;
+  });
+}
+
+/**
+ * Tirage parmi les coups que Stockfish juge presque aussi bons que son
+ * meilleur (écart ≤ `marginCp` centipions) : variété sans coup faible.
+ */
+export function pickNearBest(lines: RankedMove[], random: () => number = Math.random, marginCp = 25): string | null {
+  if (lines.length === 0) return null;
+  const top = toCp(lines[0].score);
+  const near = lines.filter((l) => toCp(l.score) >= top - marginCp);
+  return near[Math.floor(random() * near.length)]?.move ?? lines[0].move;
 }

@@ -8,7 +8,7 @@ import { countPieces } from '../core/fen';
 import { judgeByEngine, toCp } from '../core/judge/engineJudge';
 import { applyLineTolerance, isOnLine, preferLineReply } from '../core/judge/lineRules';
 import { outcomeOf } from '../core/judge/outcome';
-import { chooseDefense, strongestDefenses } from '../core/judge/opponent';
+import { chooseDefense, pickNearBest, strongestDefenses } from '../core/judge/opponent';
 import { judgeMove, type Verdict } from '../core/judge/tablebaseJudge';
 import type { Objective } from '../core/types';
 import type { Engine } from './stockfish';
@@ -21,8 +21,8 @@ export interface JudgeContext {
   /** Ligne de la partie réelle (UCI), si connue. */
   solution?: string[];
   /**
-   * Entraînement : défense la plus forte selon la table, départagée par Stockfish
-   * entre coups équivalents (sans rejouer la partie réelle).
+   * Entraînement : défense forte et variée (table à 1 coup près ; en position
+   * nulle, coups presque aussi bons selon Stockfish), sans rejouer la partie réelle.
    */
   vary?: boolean;
 }
@@ -88,17 +88,18 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
   };
 
   /**
-   * Parmi des coups que la table juge équivalents, celui que Stockfish préfère
-   * (le plus coriace en pratique) ; null si Stockfish ne répond pas en 2,5 s
-   * ou préfère un autre coup.
+   * Parmi des coups que la table juge équivalents, tirage entre ceux que
+   * Stockfish trouve presque aussi bons que son meilleur ; null si Stockfish
+   * ne répond pas en 2,5 s.
    */
-  async function engineChoice(fen: string, candidates: string[]): Promise<string | null> {
+  async function engineNearBest(fen: string, candidates: string[]): Promise<string | null> {
     try {
-      const bestmove = await Promise.race([
-        engine.analyse(fen, movetime).then((a) => a.bestmove),
+      const lines = await Promise.race([
+        engine.rank(fen, candidates, movetime),
         new Promise<null>((r) => setTimeout(() => r(null), 2_500)),
       ]);
-      return bestmove && candidates.includes(bestmove) ? bestmove : null;
+      const pick = lines ? pickNearBest(lines) : null;
+      return pick && candidates.includes(pick) ? pick : null;
     } catch {
       return null;
     }
@@ -149,8 +150,11 @@ export function createMoveJudge(tablebase: TablebaseClient, engine: Engine): Mov
             if (ctx.vary) {
               const ties = strongestDefenses(position);
               if (ties.length <= 1) return ties[0]?.uci ?? null;
-              const choice = await engineChoice(fen, ties.map((m) => m.uci));
-              return choice ?? ties[Math.floor(Math.random() * ties.length)].uci;
+              const randomTie = () => ties[Math.floor(Math.random() * ties.length)].uci;
+              // Gain ou perte : toutes ces défenses se valent à 1 coup près (garanti par la table).
+              if (outcomeOf(ties[0].category) !== 'draw') return randomTie();
+              // Nulle : la table ne les départage pas ; Stockfish garde les plus coriaces.
+              return (await engineNearBest(fen, ties.map((m) => m.uci))) ?? randomTie();
             }
             const best = chooseDefense(position);
             if (!best) return null;

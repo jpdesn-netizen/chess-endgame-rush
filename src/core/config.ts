@@ -71,7 +71,7 @@ export type ModeRules = {
   drawHoldMoves: number;
   /** Limite absolue de coups du joueur. */
   hardCapMoves: number;
-  /** Entraînement : défense la plus forte de la table, départagée par Stockfish entre coups équivalents. */
+  /** Entraînement : défense forte mais variée (table à 1 coup près ; nulle : quasi-égalité selon Stockfish). */
   varyDefense?: boolean;
 };
 
