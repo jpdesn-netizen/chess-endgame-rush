@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { subcategoryOf } from './core/categories';
 import { CONFIG, rushRules, TECHNIQUE_RULES, TRAINING_RULES } from './core/config';
 import { countPieces } from './core/fen';
@@ -12,8 +12,6 @@ import { PUZZLES_MOCK } from './data/puzzlesMock';
 import { readEmbedOptions } from './embed';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen, type HomeMode, type ThemeChoice } from './screens/HomeScreen';
-import { PrivacyScreen } from './screens/PrivacyScreen';
-import { ProgressScreen } from './screens/ProgressScreen';
 import { RushScreen } from './screens/RushScreen';
 import { getBest, scoreKey } from './services/highScores';
 import { judge } from './services/judge';
@@ -26,6 +24,18 @@ import { getSettings, setSetting } from './services/settings';
 type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number } | { name: 'technique'; id: string; n: number } | { name: 'daily' };
 
 const embed = readEmbedOptions();
+
+// Écrans secondaires chargés à part : l'accueil et le jeu s'affichent plus vite.
+const loadProgress = () => import('./screens/ProgressScreen');
+const loadPrivacy = () => import('./screens/PrivacyScreen');
+const ProgressScreen = lazy(() => loadProgress().then((m) => ({ default: m.ProgressScreen })));
+const PrivacyScreen = lazy(() => loadPrivacy().then((m) => ({ default: m.PrivacyScreen })));
+// … puis préchargés quelques secondes après l'ouverture (et gardés pour l'usage hors ligne).
+if (typeof window !== 'undefined')
+  window.setTimeout(() => {
+    void loadProgress().catch(() => {});
+    void loadPrivacy().catch(() => {});
+  }, 3_000);
 
 /** Famille et sous-catégorie calculées une fois pour toutes au chargement. */
 function classify(p: Puzzle): Puzzle {
@@ -91,7 +101,11 @@ export default function App() {
   const effectiveStart = startRating ?? autoStart;
   // Records : « automatique » a sa propre catégorie (clé 0).
   const key = mode === 'training' ? '' : scoreKey(mode, `${playerId ?? 'invite'}|${themeKey}`, startRating ?? 0);
-  const shell = (content: ReactNode) => <main className="min-h-dvh bg-stone-900 text-stone-100">{content}</main>;
+  const shell = (content: ReactNode) => (
+    <main className="min-h-dvh bg-stone-900 text-stone-100">
+      <Suspense fallback={<p className="p-6 text-center text-stone-400">Chargement…</p>}>{content}</Suspense>
+    </main>
+  );
 
   const changePlayer = useCallback((id: string | null) => {
     playerStore.setCurrentPlayer(id);

@@ -4,7 +4,7 @@
 // Sécurité : seule la clé PUBLIQUE est utilisée ici. Les données sont
 // protégées côté serveur par les règles RLS (supabase/migrations/0001_comptes.sql).
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -38,19 +38,30 @@ export function markResetRequested(done = false): void {
   }
 }
 
-export const cloud: SupabaseClient | null =
-  url && key && /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)
-    ? createClient(url, key, {
-        auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-      })
-    : null;
+/** Comptes en ligne configurés pour ce site. */
+export const cloudEnabled = !!(url && key && /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url));
 
-// Évènement « retour de réinitialisation » capté dès le chargement (avant que
-// l'interface ne s'abonne, sinon il serait perdu).
+// Évènement « retour de réinitialisation » capté dès la création du client
+// (avant que l'interface ne s'abonne, sinon il serait perdu).
 let recoveryEvent = false;
-cloud?.auth.onAuthStateChange((event) => {
-  if (event === 'PASSWORD_RECOVERY') recoveryEvent = true;
-});
+let client: Promise<SupabaseClient | null> | null = null;
+
+/**
+ * Client Supabase, chargé à part (≈ 220 Ko de code) : l'accueil s'affiche sans
+ * l'attendre. Le chargement démarre dès l'ouverture de l'appli.
+ */
+export function getCloud(): Promise<SupabaseClient | null> {
+  if (!cloudEnabled) return Promise.resolve(null);
+  client ??= import('./cloudClient')
+    .then((m) => m.createCloudClient(url!, key!, () => (recoveryEvent = true)))
+    .catch((e) => {
+      client = null; // réseau coupé : on réessaiera au prochain appel
+      throw e;
+    });
+  return client;
+}
+if (cloudEnabled) void getCloud().catch(() => {});
+
 export const recoveryDetected = () => recoveryEvent || openedFromResetLink;
 
 export const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITEKEY || null;

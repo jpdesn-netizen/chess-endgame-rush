@@ -20,7 +20,7 @@ import {
   type Run,
   type RunRow,
 } from '../core/history';
-import { cloud } from './cloud';
+import { cloudEnabled, getCloud } from './cloud';
 import type { PlayerStore } from './playerStore';
 
 const PREFIX = 'endgameRush:v1:';
@@ -81,7 +81,9 @@ function enqueue(playerId: string, entry: { attempt?: Attempt; run?: Run }): voi
 /** Envoie la file ; renvoie le nombre d'entrées envoyées. Lève une erreur en cas d'échec. */
 export async function flush(playerId: string): Promise<number> {
   const userId = linkedUser(playerId);
-  if (!cloud || !userId) return 0;
+  if (!cloudEnabled || !userId) return 0;
+  const cloud = await getCloud();
+  if (!cloud) return 0;
   const { data } = await cloud.auth.getSession();
   if (data.session?.user.id !== userId) return 0; // pas connecté avec le bon compte
   let sent = 0;
@@ -109,12 +111,14 @@ export async function flush(playerId: string): Promise<number> {
 
 /** Rapatrie l'historique en ligne et le fusionne dans le profil local. */
 export async function pull(store: PlayerStore, playerId: string): Promise<number> {
-  if (!cloud || !linkedUser(playerId)) return 0;
+  if (!cloudEnabled || !linkedUser(playerId)) return 0;
+  const cloud = await getCloud();
+  if (!cloud) return 0;
   const page = 1000;
   const fetchAll = async <T,>(table: 'attempts' | 'runs'): Promise<T[]> => {
     const rows: T[] = [];
     for (let from = 0; ; from += page) {
-      const { data, error } = await cloud!.from(table).select('*').order('id').range(from, from + page - 1);
+      const { data, error } = await cloud.from(table).select('*').order('id').range(from, from + page - 1);
       if (error) throw error;
       rows.push(...((data ?? []) as T[]));
       if (!data || data.length < page) return rows;
@@ -133,7 +137,7 @@ export async function pull(store: PlayerStore, playerId: string): Promise<number
 export function withCloudSync(local: PlayerStore, onError?: (e: unknown) => void): PlayerStore {
   const timers = new Map<string, number>();
   const schedule = (playerId: string) => {
-    if (!cloud || !linkedUser(playerId)) return;
+    if (!cloudEnabled || !linkedUser(playerId)) return;
     window.clearTimeout(timers.get(playerId));
     timers.set(
       playerId,

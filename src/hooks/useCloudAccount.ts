@@ -1,10 +1,17 @@
 // État du compte en ligne et actions (connexion, 2FA, synchronisation…).
 
-import type { Factor, Session } from '@supabase/supabase-js';
+import type { Factor, Session, SupabaseClient } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authErrorMessage, cloud, markResetRequested, openedFromEmailLink, openedFromResetLink, passwordProblem, recoveryDetected } from '../services/cloud';
+import { authErrorMessage, cloudEnabled, getCloud, markResetRequested, openedFromEmailLink, openedFromResetLink, passwordProblem, recoveryDetected } from '../services/cloud';
 import type { PlayerStore } from '../services/playerStore';
 import { flush, linkedUser, linkPlayer, pendingCount, playerOfUser, pull, unlinkPlayer } from '../services/sync';
+
+/** Client Supabase (chargé à part, voir getCloud). */
+async function sb(): Promise<SupabaseClient> {
+  const c = await getCloud();
+  if (!c) throw 'Comptes en ligne indisponibles.';
+  return c;
+}
 
 export interface CloudAccount {
   enabled: boolean;
@@ -72,40 +79,51 @@ export function useCloudAccount(
 
   // Session : lecture initiale + suivi des changements.
   useEffect(() => {
-    if (!cloud) return;
-    void cloud.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session && recoveryDetected()) setRecovery(true);
-      if (openedFromEmailLink && !data.session) {
-        setRecovery(false);
-        setMessage({
-          tone: 'error',
-          text: openedFromResetLink
-            ? 'Lien de réinitialisation expiré ou déjà utilisé : redemandez-en un (« Mot de passe oublié ? »).'
-            : 'Ce lien a été ouvert dans un autre navigateur que celui de la demande. S’il s’agissait de la confirmation de votre email, elle est faite : connectez-vous. Pour un mot de passe oublié, refaites la demande depuis ce navigateur-ci.',
-        });
-      }
+    if (!cloudEnabled) return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+    void sb().then((cloud) => {
+      if (cancelled) return;
+      void cloud.auth.getSession().then(({ data }) => {
+        setSession(data.session);
+        if (data.session && recoveryDetected()) setRecovery(true);
+        if (openedFromEmailLink && !data.session) {
+          setRecovery(false);
+          setMessage({
+            tone: 'error',
+            text: openedFromResetLink
+              ? 'Lien de réinitialisation expiré ou déjà utilisé : redemandez-en un (« Mot de passe oublié ? »).'
+              : 'Ce lien a été ouvert dans un autre navigateur que celui de la demande. S’il s’agissait de la confirmation de votre email, elle est faite : connectez-vous. Pour un mot de passe oublié, refaites la demande depuis ce navigateur-ci.',
+          });
+        }
+      });
+      const { data } = cloud.auth.onAuthStateChange((event, s) => {
+        // Pas d'appel Supabase ici (recommandation de la doc) : on met à jour l'état.
+        setSession(s);
+        if (event === 'PASSWORD_RECOVERY') setRecovery(true);
+        if (event === 'SIGNED_OUT') {
+          setNeedMfa(false);
+          setTotpFactors([]);
+          linkedFor.current = null;
+        }
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+    }).catch(() => {
+      /* bibliothèque non chargée (hors ligne) : l'appli reste utilisable en local */
     });
-    const { data } = cloud.auth.onAuthStateChange((event, s) => {
-      // Pas d'appel Supabase ici (recommandation de la doc) : on met à jour l'état.
-      setSession(s);
-      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
-      if (event === 'SIGNED_OUT') {
-        setNeedMfa(false);
-        setTotpFactors([]);
-        linkedFor.current = null;
-      }
-    });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   // Niveau d'authentification : 2FA à valider ? facteurs existants ?
   useEffect(() => {
-    if (!cloud || !session) return;
+    if (!cloudEnabled || !session) return;
     let cancelled = false;
     void (async () => {
-      const { data: aal } = await cloud!.auth.mfa.getAuthenticatorAssuranceLevel();
-      const { data: factors } = await cloud!.auth.mfa.listFactors();
+      const { data: aal } = await (await sb()).auth.mfa.getAuthenticatorAssuranceLevel();
+      const { data: factors } = await (await sb()).auth.mfa.listFactors();
       if (cancelled) return;
       setNeedMfa(aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2');
       setTotpFactors((factors?.totp ?? []).filter((f) => f.status === 'verified'));
@@ -128,7 +146,7 @@ export function useCloudAccount(
 
   // Connexion complète (2FA comprise) : lier un profil local puis synchroniser.
   useEffect(() => {
-    if (!cloud || !session || needMfa || recovery) return;
+    if (!cloudEnabled || !session || needMfa || recovery) return;
     const userId = session.user.id;
     if (linkedFor.current === userId) return;
     linkedFor.current = userId;
@@ -138,13 +156,13 @@ export function useCloudAccount(
         if (!pid) {
           if (playerId && !linkedUser(playerId)) pid = playerId; // reprise du profil en cours
           else {
-            const { data: prof } = await cloud!.from('profiles').select('pseudo').maybeSingle();
+            const { data: prof } = await (await sb()).from('profiles').select('pseudo').maybeSingle();
             pid = store.createPlayer(prof?.pseudo ?? (session.user.email ?? 'Joueur').split('@')[0]).id;
           }
           linkPlayer(store, pid, userId);
         }
         const name = store.listPlayers().find((p) => p.id === pid)?.name ?? 'Joueur';
-        await cloud!.from('profiles').upsert({ user_id: userId, pseudo: pseudoFrom(name) }, { onConflict: 'user_id', ignoreDuplicates: true });
+        await (await sb()).from('profiles').upsert({ user_id: userId, pseudo: pseudoFrom(name) }, { onConflict: 'user_id', ignoreDuplicates: true });
         onPlayerChange(pid);
         const added = await syncProfile(pid);
         ok(added ? `Synchronisé : ${added} entrée(s) récupérée(s) du compte.` : 'Synchronisé.');
@@ -162,7 +180,7 @@ export function useCloudAccount(
   }, [playerId, lastSync]);
 
   return {
-    enabled: !!cloud,
+    enabled: cloudEnabled,
     session,
     email: session?.user.email ?? null,
     needMfa,
@@ -176,7 +194,7 @@ export function useCloudAccount(
 
     signIn: (email, password, captchaToken) =>
       run(async () => {
-        const { error } = await cloud!.auth.signInWithPassword({ email, password, options: { captchaToken } });
+        const { error } = await (await sb()).auth.signInWithPassword({ email, password, options: { captchaToken } });
         if (error) throw error;
       }),
 
@@ -184,7 +202,7 @@ export function useCloudAccount(
       run(async () => {
         const problem = passwordProblem(password, email);
         if (problem) throw problem;
-        const { error } = await cloud!.auth.signUp({ email, password, options: { captchaToken, emailRedirectTo: appUrl() } });
+        const { error } = await (await sb()).auth.signUp({ email, password, options: { captchaToken, emailRedirectTo: appUrl() } });
         if (error && error.code !== 'user_already_exists') throw error;
         // Même message que le compte existe ou non (pas de divulgation).
         ok('Si cette adresse peut être utilisée, un email de confirmation vient d’être envoyé. Cliquez sur le lien, puis connectez-vous.');
@@ -193,7 +211,7 @@ export function useCloudAccount(
     resetPassword: (email, captchaToken) =>
       run(async () => {
         markResetRequested();
-        const { error } = await cloud!.auth.resetPasswordForEmail(email, { redirectTo: appUrl(), captchaToken });
+        const { error } = await (await sb()).auth.resetPasswordForEmail(email, { redirectTo: appUrl(), captchaToken });
         if (error && error.status === 429) throw error;
         ok('Si un compte existe pour cette adresse, un email de réinitialisation vient d’être envoyé. Ouvrez le lien dans CE navigateur.');
       }),
@@ -202,7 +220,7 @@ export function useCloudAccount(
       run(async () => {
         const problem = passwordProblem(password, session?.user.email ?? '');
         if (problem) throw problem;
-        const { error } = await cloud!.auth.updateUser({ password });
+        const { error } = await (await sb()).auth.updateUser({ password });
         if (error) throw error;
         setRecovery(false);
         markResetRequested(true);
@@ -212,16 +230,16 @@ export function useCloudAccount(
 
     verifyMfa: (code) =>
       run(async () => {
-        const factor = (await cloud!.auth.mfa.listFactors()).data?.totp.find((f) => f.status === 'verified');
+        const factor = (await (await sb()).auth.mfa.listFactors()).data?.totp.find((f) => f.status === 'verified');
         if (!factor) throw 'Aucun facteur 2FA trouvé.';
-        const { error } = await cloud!.auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.trim() });
+        const { error } = await (await sb()).auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.trim() });
         if (error) throw error;
         setNeedMfa(false);
       }),
 
     startMfaEnroll: () =>
       run(async () => {
-        const { data, error } = await cloud!.auth.mfa.enroll({ factorType: 'totp', friendlyName: `Endgame Rush ${Date.now()}` });
+        const { data, error } = await (await sb()).auth.mfa.enroll({ factorType: 'totp', friendlyName: `Endgame Rush ${Date.now()}` });
         if (error) throw error;
         setEnrolling({ factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret });
       }),
@@ -229,23 +247,23 @@ export function useCloudAccount(
     confirmMfaEnroll: (code) =>
       run(async () => {
         if (!enrolling) return;
-        const { error } = await cloud!.auth.mfa.challengeAndVerify({ factorId: enrolling.factorId, code: code.trim() });
+        const { error } = await (await sb()).auth.mfa.challengeAndVerify({ factorId: enrolling.factorId, code: code.trim() });
         if (error) throw error;
         setEnrolling(null);
-        const { data } = await cloud!.auth.mfa.listFactors();
+        const { data } = await (await sb()).auth.mfa.listFactors();
         setTotpFactors((data?.totp ?? []).filter((f) => f.status === 'verified'));
         ok('Double authentification activée. Elle sera demandée à chaque connexion.');
       }),
 
     cancelMfaEnroll: () =>
       run(async () => {
-        if (enrolling) await cloud!.auth.mfa.unenroll({ factorId: enrolling.factorId });
+        if (enrolling) await (await sb()).auth.mfa.unenroll({ factorId: enrolling.factorId });
         setEnrolling(null);
       }),
 
     disableMfa: (factorId) =>
       run(async () => {
-        const { error } = await cloud!.auth.mfa.unenroll({ factorId });
+        const { error } = await (await sb()).auth.mfa.unenroll({ factorId });
         if (error) throw error;
         setTotpFactors((f) => f.filter((x) => x.id !== factorId));
         ok('Double authentification désactivée.');
@@ -265,7 +283,7 @@ export function useCloudAccount(
 
     signOut: (everywhere) =>
       run(async () => {
-        await cloud!.auth.signOut({ scope: everywhere ? 'global' : 'local' });
+        await (await sb()).auth.signOut({ scope: everywhere ? 'global' : 'local' });
         ok(everywhere ? 'Déconnecté de tous les appareils.' : 'Déconnecté. Le profil reste disponible hors ligne sur cet appareil.');
       }),
 
@@ -273,18 +291,18 @@ export function useCloudAccount(
       run(async () => {
         if (!session?.user.email || confirmEmail.trim().toLowerCase() !== session.user.email.toLowerCase())
           throw 'L’email saisi ne correspond pas au compte.';
-        const { error } = await cloud!.rpc('delete_my_account');
+        const { error } = await (await sb()).rpc('delete_my_account');
         if (error) throw error;
         const pid = playerOfUser(session.user.id);
         if (pid) unlinkPlayer(pid);
-        await cloud!.auth.signOut({ scope: 'local' });
+        await (await sb()).auth.signOut({ scope: 'local' });
         ok('Compte en ligne et données en ligne supprimés. Le profil local reste sur cet appareil.');
       }),
 
     unlinkProfile: () =>
       run(async () => {
         if (playerId) unlinkPlayer(playerId);
-        await cloud!.auth.signOut({ scope: 'local' });
+        await (await sb()).auth.signOut({ scope: 'local' });
         setPending(0);
         ok('Profil délié et déconnecté sur cet appareil (les données en ligne sont conservées).');
       }),
