@@ -21,13 +21,15 @@ import type { Run } from './services/playerStore';
 import { playerStore } from './services/players';
 import { getSettings, setSetting } from './services/settings';
 
-type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number } | { name: 'technique'; id: string; n: number } | { name: 'daily' };
+type Screen = { name: 'home' } | { name: 'training'; index: number } | { name: 'rush'; run: number } | { name: 'progress' } | { name: 'privacy' } | { name: 'review'; ids: string[]; index: number } | { name: 'technique'; id: string; n: number } | { name: 'daily' } | { name: 'leaderboard' };
 
 const embed = readEmbedOptions();
 
 // Écrans secondaires chargés à part : l'accueil et le jeu s'affichent plus vite.
 const loadProgress = () => import('./screens/ProgressScreen');
 const loadPrivacy = () => import('./screens/PrivacyScreen');
+const loadLeaderboard = () => import('./screens/LeaderboardScreen');
+const LeaderboardScreen = lazy(() => loadLeaderboard().then((m) => ({ default: m.LeaderboardScreen })));
 const ProgressScreen = lazy(() => loadProgress().then((m) => ({ default: m.ProgressScreen })));
 const PrivacyScreen = lazy(() => loadPrivacy().then((m) => ({ default: m.PrivacyScreen })));
 // … puis préchargés quelques secondes après l'ouverture (et gardés pour l'usage hors ligne).
@@ -35,6 +37,7 @@ if (typeof window !== 'undefined')
   window.setTimeout(() => {
     void loadProgress().catch(() => {});
     void loadPrivacy().catch(() => {});
+    void loadLeaderboard().catch(() => {});
   }, 3_000);
 
 /** Famille et sous-catégorie calculées une fois pour toutes au chargement. */
@@ -253,6 +256,16 @@ export default function App() {
     return shell(<PrivacyScreen onHome={() => setScreen({ name: 'home' })} />);
   }
 
+  if (screen.name === 'leaderboard') {
+    return shell(
+      <LeaderboardScreen
+        signedIn={!!account.session}
+        onHome={() => setScreen({ name: 'home' })}
+        onAccount={() => setScreen({ name: 'progress' })}
+      />,
+    );
+  }
+
   if (screen.name === 'progress') {
     return shell(
       <ProgressScreen
@@ -409,6 +422,7 @@ export default function App() {
       onStartRating={setStartRating}
       onStart={() => setScreen({ name: 'rush', run: Date.now() })}
       onTrain={(index) => setScreen({ name: 'training', index })}
+      onLeaderboard={account.enabled ? () => setScreen({ name: 'leaderboard' }) : undefined}
     />,
   );
 }

@@ -116,6 +116,8 @@ export function AccountPanel({ account, playerId, playerName }: { account: Cloud
           </button>
         </div>
 
+        {a.publicProfile && <LeaderboardOptIn account={a} />}
+
         <details className="rounded-lg bg-stone-900/60 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-stone-200">
             🔐 Double authentification {a.totpFactors.length ? '(activée)' : '(recommandée)'}
@@ -280,5 +282,52 @@ function Box({ children }: { children: ReactNode }) {
       <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-400">Compte en ligne</h3>
       {children}
     </div>
+  );
+}
+
+/** Participation volontaire au classement public, sous un pseudo. */
+function LeaderboardOptIn({ account: a }: { account: CloudAccount }) {
+  const current = a.publicProfile!;
+  const [pseudo, setPseudo] = useState(current.pseudo);
+  return (
+    <details className="rounded-lg bg-stone-900/60 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-stone-200">
+        🏆 Classement {current.leaderboard ? `(vous y figurez : ${current.pseudo})` : '(non affiché)'}
+      </summary>
+      <div className="mt-2 flex flex-col gap-2 text-sm text-stone-300">
+        <p>
+          Facultatif. Si vous participez, votre <strong>pseudo</strong> et vos résultats (Elo, record Storm, puzzles réussis
+          de la semaine) sont visibles par <strong>tous les visiteurs du site</strong>. Votre email n’est jamais affiché.
+          Vous pouvez vous retirer à tout moment.
+        </p>
+        <label htmlFor="lb-pseudo">Pseudo public :</label>
+        <input
+          id="lb-pseudo"
+          className={input}
+          value={pseudo}
+          maxLength={30}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          onChange={(e) => setPseudo(e.target.value)}
+        />
+        <div className="flex flex-wrap gap-2">
+          {current.leaderboard ? (
+            <>
+              <button type="button" className={secondary} disabled={a.busy || pseudo.trim() === current.pseudo} onClick={() => a.setLeaderboard(true, pseudo)}>
+                Changer de pseudo
+              </button>
+              <button type="button" className={secondary} disabled={a.busy} onClick={() => a.setLeaderboard(false, current.pseudo)}>
+                Me retirer du classement
+              </button>
+            </>
+          ) : (
+            <button type="button" className={primary} disabled={a.busy} onClick={() => a.setLeaderboard(true, pseudo)}>
+              Apparaître dans le classement
+            </button>
+          )}
+        </div>
+      </div>
+    </details>
   );
 }

@@ -48,6 +48,8 @@ interface Props {
   counts: Map<string, number>;
   playerName: string | null;
   onProgress: () => void;
+  /** Classement public (absent si les comptes en ligne ne sont pas configurés). */
+  onLeaderboard?: () => void;
   onPrivacy: () => void;
   /** Révision des erreurs (joueur sélectionné) : à revoir maintenant / en cours / mode. */
   review: { due: number; total: number; spaced: boolean } | null;
@@ -104,6 +106,17 @@ export function HomeScreen(p: Props) {
         </div>
         <div className="flex flex-wrap justify-end gap-2">
         {!p.compact && <InstallButton />}
+        {p.onLeaderboard && !p.compact && (
+          <button
+            type="button"
+            onClick={p.onLeaderboard}
+            className="rounded-lg bg-stone-800 px-3 py-2 text-sm font-semibold text-stone-100 hover:bg-stone-700"
+            title="Classement des joueurs"
+            aria-label="Classement des joueurs"
+          >
+            🏆
+          </button>
+        )}
         <button
           type="button"
           onClick={p.onProgress}

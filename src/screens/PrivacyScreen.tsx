@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 const CONTACT = import.meta.env.VITE_CONTACT_EMAIL || '';
 export const SOURCE_URL = import.meta.env.VITE_SOURCE_URL || '';
-const UPDATED = '25 septembre 2026';
+const UPDATED = '26 septembre 2026';
 
 export function PrivacyScreen({ onHome }: { onHome: () => void }) {
   return (
@@ -23,6 +23,7 @@ export function PrivacyScreen({ onHome }: { onHome: () => void }) {
           <li>Sans compte, vos parties restent dans votre navigateur : rien n’est envoyé à nos serveurs.</li>
           <li>Avec un compte, nous conservons votre email, votre pseudo et votre historique d’entraînement, uniquement pour les retrouver sur vos appareils.</li>
           <li>Aucune publicité, aucune revente, aucune mesure d’audience, aucun cookie publicitaire.</li>
+          <li>Classement public : uniquement si vous l’activez, sous un pseudo.</li>
           <li>Vous pouvez supprimer votre compte et toutes ses données à tout moment, depuis l’appli.</li>
         </ul>
       </Section>
@@ -64,7 +65,17 @@ export function PrivacyScreen({ onHome }: { onHome: () => void }) {
         <p>
           Finalité : vous permettre de retrouver votre progression sur plusieurs appareils. Ces données sont traitées parce que vous
           avez choisi de créer un compte (exécution du service demandé). Elles ne sont ni vendues, ni utilisées à des fins
-          publicitaires, ni visibles par les autres joueurs.
+          publicitaires, ni visibles par les autres joueurs, sauf si vous participez au classement (ci-dessous).
+        </p>
+      </Section>
+
+      <Section title="Classement public (facultatif)">
+        <p>
+          Seulement si vous le choisissez (« Apparaître dans le classement », écran 📈) : votre <strong>pseudo</strong> et des
+          résultats calculés à partir de votre historique (Elo, record Storm, puzzles réussis sur 7 jours) sont visibles par
+          tous les visiteurs du site. Ni votre email ni l’identifiant de votre compte ne sont publiés. Base : votre
+          consentement, que vous pouvez retirer à tout moment (« Me retirer du classement ») ; le classement est mis à jour
+          sous 5 minutes.
         </p>
       </Section>
 

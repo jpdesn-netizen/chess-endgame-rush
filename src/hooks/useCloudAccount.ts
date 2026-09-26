@@ -41,6 +41,9 @@ export interface CloudAccount {
   deleteAccount(confirmEmail: string): Promise<void>;
   /** Délie le profil local du compte et se déconnecte sur cet appareil. */
   unlinkProfile(): Promise<void>;
+  /** Pseudo public et participation au classement (null tant que non chargé). */
+  publicProfile: { pseudo: string; leaderboard: boolean } | null;
+  setLeaderboard(on: boolean, pseudo: string): Promise<void>;
 }
 
 const appUrl = () => `${window.location.origin}${window.location.pathname}`;
@@ -60,6 +63,7 @@ export function useCloudAccount(
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [totpFactors, setTotpFactors] = useState<Factor[]>([]);
   const [enrolling, setEnrolling] = useState<CloudAccount['enrolling']>(null);
+  const [publicProfile, setPublicProfile] = useState<CloudAccount['publicProfile']>(null);
   const linkedFor = useRef<string | null>(null);
 
   const ok = (text: string) => setMessage({ tone: 'ok', text });
@@ -174,6 +178,26 @@ export function useCloudAccount(
       }
     })();
   }, [session, needMfa, recovery, playerId, store, onPlayerChange, syncProfile]);
+
+  // Pseudo public et participation au classement.
+  useEffect(() => {
+    if (!cloudEnabled || !session || needMfa || recovery) {
+      setPublicProfile(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await (await sb()).from('profiles').select('pseudo, leaderboard').maybeSingle();
+        if (!cancelled && data) setPublicProfile({ pseudo: data.pseudo, leaderboard: !!data.leaderboard });
+      } catch {
+        /* colonne absente (migration 0004 non exécutée) ou réseau : réglage masqué */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, needMfa, recovery, lastSync]);
 
   useEffect(() => {
     if (playerId) setPending(pendingCount(playerId));
@@ -297,6 +321,20 @@ export function useCloudAccount(
         if (pid) unlinkPlayer(pid);
         await (await sb()).auth.signOut({ scope: 'local' });
         ok('Compte en ligne et données en ligne supprimés. Le profil local reste sur cet appareil.');
+      }),
+
+    publicProfile,
+    setLeaderboard: (on, pseudo) =>
+      run(async () => {
+        const clean = pseudo.trim();
+        if (!/^[\p{L}\p{N} _.-]{2,30}$/u.test(clean)) throw 'Pseudo : 2 à 30 caractères (lettres, chiffres, espace, _ . -).';
+        if (!session) throw 'Non connecté.';
+        const { error } = await (await sb()).from('profiles').update({ pseudo: clean, leaderboard: on }).eq('user_id', session.user.id);
+        if (error?.code === '23505') throw 'Ce pseudo est déjà utilisé dans le classement : choisissez-en un autre.';
+        if (error?.code === '23514') throw 'Pseudo refusé : 2 à 30 caractères (lettres, chiffres, espace, _ . -).';
+        if (error) throw error;
+        setPublicProfile({ pseudo: clean, leaderboard: on });
+        ok(on ? `Vous apparaissez dans le classement sous le pseudo « ${clean} » (mise à jour sous 5 min).` : 'Vous n’apparaissez plus dans le classement (mise à jour sous 5 min).');
       }),
 
     unlinkProfile: () =>
